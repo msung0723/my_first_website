@@ -231,6 +231,17 @@ header {
     line-height: 1.45;
 }
 
+#youtube-player-host {
+    position: fixed;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    left: -9999px;
+    top: -9999px;
+}
+
 .music-center {
     flex: 1;
     display: flex;
@@ -284,8 +295,9 @@ header {
 .record-disc:hover,
 .record-disc:focus-visible {
     box-shadow:
-        0 0 0 2px rgba(255,255,255,0.55),
-        0 0 28px rgba(255,255,255,0.45),
+        0 0 0 2px rgba(114,214,255,0.72),
+        0 0 22px rgba(114,214,255,0.62),
+        0 0 42px rgba(114,214,255,0.32),
         0 28px 60px rgba(0,0,0,0.22),
         inset 0 0 0 1px rgba(255,255,255,0.08);
     transform: scale(1.01);
@@ -294,10 +306,12 @@ header {
 
 .record-disc.is-playing {
     box-shadow:
-        0 0 0 2px rgba(255,255,255,0.65),
-        0 0 34px rgba(255,255,255,0.5),
+        0 0 0 2px rgba(118,220,255,0.82),
+        0 0 26px rgba(118,220,255,0.72),
+        0 0 56px rgba(118,220,255,0.32),
         0 30px 70px rgba(0,0,0,0.22),
         inset 0 0 0 1px rgba(255,255,255,0.08);
+    animation: record-spin 4.8s linear infinite;
 }
 
 .record-label {
@@ -378,6 +392,88 @@ header {
     color: rgba(17,17,17,0.55);
     text-align: center;
     min-height: 1.3rem;
+}
+
+.playback-bar {
+    width: min(720px, 90vw);
+    display: grid;
+    grid-template-columns: auto auto minmax(180px, 1fr) auto auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 24px;
+    background: rgba(255,255,255,0.9);
+    border: 1px solid rgba(17,17,17,0.08);
+    box-shadow: 0 14px 32px rgba(17,17,17,0.08);
+}
+
+.playback-circle-btn,
+.playback-mode-btn {
+    border: none;
+    background: transparent;
+    color: #56606a;
+    cursor: pointer;
+    transition: transform 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.playback-circle-btn {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #eff7fc;
+    color: #111;
+    font-size: 1rem;
+}
+
+.playback-circle-btn:hover,
+.playback-mode-btn:hover {
+    transform: translateY(-1px);
+}
+
+.playback-mode-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.playback-mode-btn.is-active {
+    background: #e8f7ff;
+    color: #1492cb;
+}
+
+.playback-time {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: rgba(17,17,17,0.55);
+    min-width: 38px;
+    text-align: center;
+}
+
+.playback-progress {
+    width: 100%;
+    accent-color: #69d2ff;
+    cursor: pointer;
+}
+
+.playback-progress:disabled,
+.playback-circle-btn:disabled,
+.playback-mode-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+@keyframes record-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
 }
 
 .music-playlist {
@@ -609,6 +705,15 @@ header {
 
     .record-wrapper { width: 400px; height: 400px; }
     .record-disc { width: 380px; height: 380px; }
+    .playback-bar {
+        width: min(100%, 760px);
+        grid-template-columns: repeat(2, auto) minmax(120px, 1fr) auto;
+        justify-content: center;
+    }
+    .playback-mode-btn {
+        grid-column: span 2;
+        justify-content: center;
+    }
 }
 
 @media (max-width: 700px) {
@@ -634,6 +739,19 @@ header {
     .record-disc { width: 270px; height: 270px; }
     .record-label { width: 92px; height: 92px; }
     .now-playing-title { font-size: 1.5rem; }
+    .playback-bar {
+        grid-template-columns: auto auto 1fr auto;
+        gap: 10px;
+        padding: 14px;
+    }
+    .playback-mode-btn {
+        grid-column: span 2;
+        width: 100%;
+        justify-content: center;
+    }
+    .playback-mode-btn span {
+        font-size: 0.84rem;
+    }
     .playlist-item.is-selected { font-size: 1.2rem; }
     .playlist-editor-top,
     .playlist-editor-actions,

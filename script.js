@@ -38,6 +38,13 @@ const playlistItemsEl = document.getElementById("playlist-items");
 const recordDisc = document.getElementById("record-disc");
 const recordHint = document.getElementById("record-hint");
 const nowPlayingTitle = document.getElementById("now-playing-title");
+const transportToggleBtn = document.getElementById("transport-toggle");
+const transportToggleIcon = document.getElementById("transport-toggle-icon");
+const playbackCurrentTime = document.getElementById("playback-current-time");
+const playbackDuration = document.getElementById("playback-duration");
+const playbackProgress = document.getElementById("playback-progress");
+const repeatToggleBtn = document.getElementById("repeat-toggle");
+const autoplayToggleBtn = document.getElementById("autoplay-toggle");
 const musicEmptyState = document.getElementById("music-empty-state");
 const musicAudio = document.getElementById("music-audio");
 
@@ -85,13 +92,18 @@ let musicAddSourceType = "youtube";
 let youtubePlayer = null;
 let youtubeApiPromise = null;
 let youtubeReadyResolver = null;
+let youtubePlayerReadyPromise = null;
+let playbackMonitorInterval = null;
+let isScrubbingPlayback = false;
 
 let musicState = {
     library: [],
     playlists: [],
     currentPlaylistId: null,
     selectedTrackId: null,
-    playingTrackId: null
+    playingTrackId: null,
+    repeatEnabled: false,
+    autoplayEnabled: false
 };
 
 window.onYouTubeIframeAPIReady = function() {
@@ -147,8 +159,8 @@ function bindCoreEvents() {
 
     document.getElementById("nav-profile-btn").onclick = () => showPage("profile-page");
     navLogoutBtn.onclick = handleLogout;
-    document.getElementById("back-to-main").onclick = () => location.reload();
-    document.getElementById("logo-main").onclick = () => location.reload();
+    document.getElementById("back-to-main").onclick = () => showPage("main-page");
+    document.getElementById("logo-main").onclick = () => showPage("main-page");
 
     window.onclick = (e) => {
         if (e.target.classList.contains("auth-overlay")) {
@@ -242,6 +254,10 @@ function showPage(pageId) {
 
     Object.values(sidebarItems).forEach((item) => item && item.classList.remove("active"));
     if (sidebarItems[pageId]) sidebarItems[pageId].classList.add("active");
+
+    if (pageId === "music-page") {
+        renderMusicUI();
+    }
 }
 
 function handleSignup() {
@@ -408,7 +424,8 @@ async function saveProfileSettings() {
 async function initMusicPage() {
     bindMusicEvents();
     await loadMusicState();
-    renderMusicUI();
+    startPlaybackMonitor();
+    syncPlaybackUi();
 }
 
 function bindMusicEvents() {
@@ -422,7 +439,12 @@ function bindMusicEvents() {
     playlistNextBtn.onclick = () => switchPlaylist(1);
     playlistUpBtn.onclick = () => moveSelection(-1);
     playlistDownBtn.onclick = () => moveSelection(1);
-    recordDisc.onclick = () => playSelectedTrack();
+    recordDisc.onclick = () => handleRecordInteraction();
+    transportToggleBtn.onclick = () => handleTransportToggle();
+    repeatToggleBtn.onclick = () => toggleRepeatMode();
+    autoplayToggleBtn.onclick = () => toggleAutoplayMode();
+    playbackProgress.addEventListener("input", handlePlaybackScrub);
+    playbackProgress.addEventListener("change", applyPlaybackScrub);
 
     editPlaylistBtn.onclick = () => openPlaylistEditor();
     closePlaylistEditorBtn.onclick = () => playlistEditorModal.classList.add("hidden");
@@ -442,22 +464,19 @@ function bindMusicEvents() {
     deletePlaylistBtn.onclick = () => deleteCurrentPlaylist();
 
     musicAudio.addEventListener("play", () => {
-        recordDisc.classList.add("is-playing");
-        renderPlaylist();
-        updatePlaybackTexts();
+        syncPlaybackUi();
     });
 
     musicAudio.addEventListener("pause", () => {
-        if (!isYoutubePlaying()) recordDisc.classList.remove("is-playing");
-        renderPlaylist();
-        updatePlaybackTexts();
+        syncPlaybackUi();
     });
 
     musicAudio.addEventListener("ended", () => {
-        if (!isYoutubePlaying()) recordDisc.classList.remove("is-playing");
-        renderPlaylist();
-        updatePlaybackTexts();
+        handleTrackEnded();
     });
+
+    musicAudio.addEventListener("loadedmetadata", () => updatePlaybackProgressUi());
+    musicAudio.addEventListener("timeupdate", () => updatePlaybackProgressUi());
 }
 
 async function loadMusicState() {
@@ -477,6 +496,8 @@ async function loadMusicState() {
     musicState.currentPlaylistId = savedState.currentPlaylistId || null;
     musicState.selectedTrackId = savedState.selectedTrackId || null;
     musicState.playingTrackId = savedState.playingTrackId || null;
+    musicState.repeatEnabled = Boolean(savedState.repeatEnabled);
+    musicState.autoplayEnabled = Boolean(savedState.autoplayEnabled);
     if (!musicState.playlists.length) {
         const defaultPlaylist = createPlaylistObject(DEFAULT_PLAYLIST_NAME);
         musicState.playlists = [defaultPlaylist];
@@ -601,7 +622,9 @@ function saveMusicState() {
         playlists: musicState.playlists,
         currentPlaylistId: musicState.currentPlaylistId,
         selectedTrackId: musicState.selectedTrackId,
-        playingTrackId: musicState.playingTrackId
+        playingTrackId: musicState.playingTrackId,
+        repeatEnabled: musicState.repeatEnabled,
+        autoplayEnabled: musicState.autoplayEnabled
     }));
 }
 
@@ -710,7 +733,71 @@ function moveSelection(direction) {
 
     musicState.selectedTrackId = playlist.trackIds[nextIndex];
     saveMusicState();
-    renderMusicUI();
+    syncPlaybackUi();
+}
+
+async function handleRecordInteraction() {
+    const selectedTrack = getTrackById(musicState.selectedTrackId);
+    if (!selectedTrack) {
+        alert("먼저 재생할 음악을 선택해주세요.");
+        return;
+    }
+
+    if (musicState.playingTrackId === selectedTrack.id) {
+        await toggleCurrentPlayback(selectedTrack);
+        return;
+    }
+
+    await playSelectedTrack();
+}
+
+async function handleTransportToggle() {
+    const playingTrack = getTrackById(musicState.playingTrackId);
+    if (playingTrack) {
+        await toggleCurrentPlayback(playingTrack);
+        return;
+    }
+
+    await handleRecordInteraction();
+}
+
+async function toggleCurrentPlayback(track) {
+    if (track.sourceType === "youtube") {
+        const player = await ensureYoutubePlayer();
+        if (!player || !window.YT) return;
+
+        const state = typeof player.getPlayerState === "function"
+            ? player.getPlayerState()
+            : window.YT.PlayerState.UNSTARTED;
+
+        if (state === window.YT.PlayerState.PLAYING) {
+            player.pauseVideo();
+        } else {
+            youtubePlayerHost.classList.remove("hidden");
+            player.playVideo();
+        }
+
+        syncPlaybackUi();
+        return;
+    }
+
+    if (!musicAudio.src) {
+        await playSelectedTrack();
+        return;
+    }
+
+    if (!musicAudio.paused) {
+        musicAudio.pause();
+    } else {
+        if (musicAudio.ended) musicAudio.currentTime = 0;
+        try {
+            await musicAudio.play();
+        } catch {
+            alert("브라우저가 재생을 다시 시작하지 못했습니다. 다시 눌러주세요.");
+        }
+    }
+
+    syncPlaybackUi();
 }
 
 async function playSelectedTrack() {
@@ -764,26 +851,43 @@ async function playYoutubeTrack(track) {
 
     musicState.playingTrackId = track.id;
     saveMusicState();
-    player.loadVideoById(track.youtubeId);
     youtubePlayerHost.classList.remove("hidden");
+    player.loadVideoById(track.youtubeId);
+    if (typeof player.unMute === "function") player.unMute();
+    if (typeof player.setVolume === "function") player.setVolume(100);
+    if (typeof player.playVideo === "function") {
+        player.playVideo();
+    }
     renderMusicUI();
 }
 
 async function ensureYoutubePlayer() {
     await loadYoutubeApi();
 
-    if (youtubePlayer) return youtubePlayer;
+    if (youtubePlayer && youtubePlayerReadyPromise) {
+        await youtubePlayerReadyPromise;
+        return youtubePlayer;
+    }
 
-    youtubePlayer = new window.YT.Player("youtube-player", {
-        width: "0",
-        height: "0",
-        videoId: "",
-        playerVars: { autoplay: 1, controls: 0 },
-        events: {
-            onStateChange: handleYoutubeStateChange
-        }
+    if (youtubePlayerReadyPromise) {
+        await youtubePlayerReadyPromise;
+        return youtubePlayer;
+    }
+
+    youtubePlayerReadyPromise = new Promise((resolve) => {
+        youtubePlayer = new window.YT.Player("youtube-player", {
+            width: "1",
+            height: "1",
+            videoId: "",
+            playerVars: { autoplay: 1, controls: 0 },
+            events: {
+                onReady: () => resolve(),
+                onStateChange: handleYoutubeStateChange
+            }
+        });
     });
 
+    await youtubePlayerReadyPromise;
     return youtubePlayer;
 }
 
@@ -805,15 +909,17 @@ function handleYoutubeStateChange(event) {
     if (!window.YT) return;
 
     if (event.data === window.YT.PlayerState.PLAYING) {
-        recordDisc.classList.add("is-playing");
-    } else if (event.data === window.YT.PlayerState.PAUSED || event.data === window.YT.PlayerState.ENDED) {
-        recordDisc.classList.remove("is-playing");
+        syncPlaybackUi();
+    } else if (event.data === window.YT.PlayerState.PAUSED) {
+        syncPlaybackUi();
     }
 
     if (event.data === window.YT.PlayerState.ENDED) {
-        renderPlaylist();
-        updatePlaybackTexts();
+        handleTrackEnded();
+        return;
     }
+
+    updatePlaybackProgressUi();
 }
 
 function stopYoutubePlayback() {
@@ -832,6 +938,8 @@ function renderMusicUI() {
     renderPlaylistSwitcher();
     renderPlaylist();
     updatePlaybackTexts();
+    updatePlaybackControls();
+    updatePlaybackProgressUi();
 }
 
 function renderPlaylistSwitcher() {
@@ -1204,4 +1312,340 @@ async function getTrackBlob(trackId) {
         request.onsuccess = () => resolve(request.result || null);
         request.onerror = () => reject(request.error);
     });
+}
+
+async function handleRecordInteraction() {
+    const selectedTrack = getTrackById(musicState.selectedTrackId);
+    if (!selectedTrack) {
+        alert("먼저 재생할 음악을 선택해주세요.");
+        return;
+    }
+
+    if (musicState.playingTrackId === selectedTrack.id) {
+        await toggleCurrentPlayback(selectedTrack);
+        return;
+    }
+
+    await playSelectedTrack();
+}
+
+async function toggleCurrentPlayback(track) {
+    if (track.sourceType === "youtube") {
+        const player = await ensureYoutubePlayer();
+        if (!player || !window.YT) return;
+
+        const state = typeof player.getPlayerState === "function"
+            ? player.getPlayerState()
+            : window.YT.PlayerState.UNSTARTED;
+
+        if (state === window.YT.PlayerState.PLAYING) {
+            player.pauseVideo();
+        } else {
+            youtubePlayerHost.classList.remove("hidden");
+            player.playVideo();
+        }
+
+        syncPlaybackUi();
+        return;
+    }
+
+    if (!musicAudio.src) {
+        await playSelectedTrack();
+        return;
+    }
+
+    if (!musicAudio.paused) {
+        musicAudio.pause();
+    } else {
+        if (musicAudio.ended) musicAudio.currentTime = 0;
+        try {
+            await musicAudio.play();
+        } catch {
+            alert("브라우저가 재생을 다시 시작하지 못했습니다. 다시 눌러주세요.");
+        }
+    }
+
+    syncPlaybackUi();
+}
+
+async function playSelectedTrack() {
+    const selectedTrack = getTrackById(musicState.selectedTrackId);
+    if (!selectedTrack) {
+        alert("먼저 재생할 음악을 선택해주세요.");
+        return;
+    }
+
+    if (selectedTrack.sourceType === "youtube") {
+        await playYoutubeTrack(selectedTrack);
+        return;
+    }
+
+    stopYoutubePlayback();
+
+    if (activeAudioUrl) {
+        URL.revokeObjectURL(activeAudioUrl);
+        activeAudioUrl = null;
+    }
+
+    const blob = await getTrackBlob(selectedTrack.id);
+    if (!blob) {
+        alert("음악 파일을 불러오지 못했습니다.");
+        return;
+    }
+
+    activeAudioUrl = URL.createObjectURL(blob);
+    musicAudio.src = activeAudioUrl;
+    musicState.playingTrackId = selectedTrack.id;
+    saveMusicState();
+
+    try {
+        await musicAudio.play();
+    } catch {
+        alert("브라우저가 재생을 시작하지 못했습니다. 다시 눌러주세요.");
+    }
+
+    syncPlaybackUi();
+}
+
+async function playYoutubeTrack(track) {
+    musicAudio.pause();
+    musicAudio.removeAttribute("src");
+
+    const player = await ensureYoutubePlayer();
+    if (!player) {
+        alert("유튜브 플레이어를 불러오지 못했습니다.");
+        return;
+    }
+
+    musicState.playingTrackId = track.id;
+    saveMusicState();
+    youtubePlayerHost.classList.remove("hidden");
+    player.loadVideoById(track.youtubeId);
+    if (typeof player.unMute === "function") player.unMute();
+    if (typeof player.setVolume === "function") player.setVolume(100);
+    if (typeof player.playVideo === "function") player.playVideo();
+    syncPlaybackUi();
+}
+
+function handleYoutubeStateChange(event) {
+    if (!window.YT) return;
+
+    if (event.data === window.YT.PlayerState.PLAYING || event.data === window.YT.PlayerState.PAUSED) {
+        syncPlaybackUi();
+    }
+
+    if (event.data === window.YT.PlayerState.ENDED) {
+        handleTrackEnded();
+        return;
+    }
+
+    updatePlaybackProgressUi();
+}
+
+function renderMusicUI() {
+    renderPlaylistSwitcher();
+    renderPlaylist();
+    updatePlaybackTexts();
+    updatePlaybackControls();
+    updatePlaybackProgressUi();
+}
+
+function updatePlaybackTexts() {
+    const selectedTrack = getTrackById(musicState.selectedTrackId);
+    const playingTrack = getTrackById(musicState.playingTrackId);
+    const isPaused = isPlaybackPaused();
+
+    recordHint.textContent = selectedTrack
+        ? `선택된 음악: ${selectedTrack.name}`
+        : "재생할 음악을 선택한 뒤 음반을 눌러주세요";
+
+    if (playingTrack) {
+        nowPlayingTitle.textContent = `${isPaused ? "일시정지:" : "재생 중:"} ${playingTrack.name}`;
+    } else {
+        nowPlayingTitle.textContent = "재생 중인 음악 없음";
+    }
+}
+
+function updatePlaybackControls() {
+    const hasTrack = Boolean(musicState.playingTrackId);
+    const hasSelectedTrack = Boolean(musicState.selectedTrackId);
+    const isPlaying = isPlaybackActive();
+
+    transportToggleBtn.disabled = !hasTrack && !hasSelectedTrack;
+    transportToggleIcon.className = `fa-solid ${isPlaying ? "fa-pause" : "fa-play"}`;
+
+    repeatToggleBtn.classList.toggle("is-active", musicState.repeatEnabled);
+    repeatToggleBtn.setAttribute("aria-pressed", String(musicState.repeatEnabled));
+    autoplayToggleBtn.classList.toggle("is-active", musicState.autoplayEnabled);
+    autoplayToggleBtn.setAttribute("aria-pressed", String(musicState.autoplayEnabled));
+}
+
+function syncPlaybackUi() {
+    const isPlaying = isPlaybackActive();
+    recordDisc.classList.toggle("is-playing", isPlaying);
+    renderPlaylist();
+    updatePlaybackTexts();
+    updatePlaybackControls();
+    updatePlaybackProgressUi();
+}
+
+function startPlaybackMonitor() {
+    if (playbackMonitorInterval) clearInterval(playbackMonitorInterval);
+    playbackMonitorInterval = setInterval(() => {
+        updatePlaybackControls();
+        updatePlaybackProgressUi();
+    }, 500);
+}
+
+function isPlaybackActive() {
+    if (isYoutubePlaying()) return true;
+    return Boolean(musicState.playingTrackId && musicAudio.src && !musicAudio.paused && !musicAudio.ended);
+}
+
+function isPlaybackPaused() {
+    if (!musicState.playingTrackId) return false;
+
+    const playingTrack = getTrackById(musicState.playingTrackId);
+    if (!playingTrack) return false;
+
+    if (playingTrack.sourceType === "youtube") {
+        if (!youtubePlayer || !window.YT || typeof youtubePlayer.getPlayerState !== "function") return false;
+        return youtubePlayer.getPlayerState() === window.YT.PlayerState.PAUSED;
+    }
+
+    return Boolean(musicAudio.src) && musicAudio.paused && !musicAudio.ended;
+}
+
+function getPlaybackMetrics() {
+    const playingTrack = getTrackById(musicState.playingTrackId);
+    if (!playingTrack) return { currentTime: 0, duration: 0 };
+
+    if (playingTrack.sourceType === "youtube") {
+        if (!youtubePlayer) return { currentTime: 0, duration: 0 };
+        return {
+            currentTime: typeof youtubePlayer.getCurrentTime === "function" ? youtubePlayer.getCurrentTime() : 0,
+            duration: typeof youtubePlayer.getDuration === "function" ? youtubePlayer.getDuration() : 0
+        };
+    }
+
+    return {
+        currentTime: Number.isFinite(musicAudio.currentTime) ? musicAudio.currentTime : 0,
+        duration: Number.isFinite(musicAudio.duration) ? musicAudio.duration : 0
+    };
+}
+
+function updatePlaybackProgressUi() {
+    if (isScrubbingPlayback) return;
+
+    const { currentTime, duration } = getPlaybackMetrics();
+    playbackCurrentTime.textContent = formatTime(currentTime);
+    playbackDuration.textContent = formatTime(duration);
+    playbackProgress.disabled = !musicState.playingTrackId || duration <= 0;
+    playbackProgress.value = duration > 0 ? (currentTime / duration) * 100 : 0;
+}
+
+function handlePlaybackScrub() {
+    isScrubbingPlayback = true;
+    const { duration } = getPlaybackMetrics();
+    const previewTime = duration > 0 ? (Number(playbackProgress.value) / 100) * duration : 0;
+    playbackCurrentTime.textContent = formatTime(previewTime);
+}
+
+function applyPlaybackScrub() {
+    const { duration } = getPlaybackMetrics();
+    const nextTime = duration > 0 ? (Number(playbackProgress.value) / 100) * duration : 0;
+    seekPlayback(nextTime);
+    isScrubbingPlayback = false;
+    updatePlaybackProgressUi();
+}
+
+function seekPlayback(nextTime) {
+    const playingTrack = getTrackById(musicState.playingTrackId);
+    if (!playingTrack) return;
+
+    if (playingTrack.sourceType === "youtube") {
+        if (youtubePlayer && typeof youtubePlayer.seekTo === "function") {
+            youtubePlayer.seekTo(nextTime, true);
+        }
+        return;
+    }
+
+    if (musicAudio.src) {
+        musicAudio.currentTime = nextTime;
+    }
+}
+
+function toggleRepeatMode() {
+    musicState.repeatEnabled = !musicState.repeatEnabled;
+    saveMusicState();
+    updatePlaybackControls();
+}
+
+function toggleAutoplayMode() {
+    musicState.autoplayEnabled = !musicState.autoplayEnabled;
+    saveMusicState();
+    updatePlaybackControls();
+}
+
+async function handleTrackEnded() {
+    recordDisc.classList.remove("is-playing");
+
+    if (musicState.repeatEnabled && musicState.playingTrackId) {
+        await restartCurrentTrack();
+        return;
+    }
+
+    if (musicState.autoplayEnabled && selectAdjacentTrackForPlayback(1)) {
+        await playSelectedTrack();
+        return;
+    }
+
+    musicState.playingTrackId = null;
+    saveMusicState();
+    syncPlaybackUi();
+}
+
+async function restartCurrentTrack() {
+    const playingTrack = getTrackById(musicState.playingTrackId);
+    if (!playingTrack) return;
+
+    musicState.selectedTrackId = playingTrack.id;
+    if (playingTrack.sourceType === "youtube") {
+        const player = await ensureYoutubePlayer();
+        if (!player) return;
+        player.seekTo(0, true);
+        player.playVideo();
+    } else {
+        musicAudio.currentTime = 0;
+        try {
+            await musicAudio.play();
+        } catch {
+            alert("반복 재생을 시작하지 못했습니다. 다시 눌러주세요.");
+        }
+    }
+
+    syncPlaybackUi();
+}
+
+function selectAdjacentTrackForPlayback(direction) {
+    const playlist = getCurrentPlaylist();
+    if (!playlist || !playlist.trackIds.length) return false;
+
+    const playingIndex = playlist.trackIds.indexOf(musicState.playingTrackId);
+    const baseIndex = playingIndex === -1 ? playlist.trackIds.indexOf(musicState.selectedTrackId) : playingIndex;
+    const nextIndex = baseIndex + direction;
+
+    if (nextIndex < 0 || nextIndex >= playlist.trackIds.length) return false;
+
+    musicState.selectedTrackId = playlist.trackIds[nextIndex];
+    saveMusicState();
+    renderMusicUI();
+    return true;
+}
+
+function formatTime(seconds) {
+    const totalSeconds = Math.max(0, Math.floor(seconds || 0));
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins}:${String(secs).padStart(2, "0")}`;
 }

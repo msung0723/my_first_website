@@ -16,15 +16,22 @@ const previewPlus = document.getElementById("preview-plus");
 const imageInput = document.getElementById("image-input");
 const rainbowMode = document.getElementById("rainbow-mode");
 const borderColorInput = document.getElementById("profile-border-color");
+const backgroundImageSetupBtn = document.getElementById("background-image-setup");
+const resetBackgroundImageBtn = document.getElementById("reset-background-image");
+const backgroundImageInput = document.getElementById("background-image-input");
+const applyHeaderWallpaperInput = document.getElementById("apply-header-wallpaper");
+const pageHeader = document.querySelector("header");
 
 const sidebar = document.getElementById("sidebar");
 const sidebarToggle = document.getElementById("sidebar-toggle");
 const sidebarClose = document.getElementById("sidebar-close");
 const menuMain = document.getElementById("menu-main");
 const menuMusic = document.getElementById("menu-music");
+const menuVideo = document.getElementById("menu-video");
 const sidebarItems = {
     "main-page": menuMain.closest("li"),
-    "music-page": menuMusic.closest("li")
+    "music-page": menuMusic.closest("li"),
+    "video-page": menuVideo.closest("li")
 };
 
 const addMusicBtn = document.getElementById("add-music-btn");
@@ -76,9 +83,43 @@ const recordStyleBtn = document.getElementById("record-style-btn");
 const recordStylePreviewDisc = document.getElementById("record-style-preview-disc");
 const recordCoverArt = document.getElementById("record-cover-art");
 const recordStyleModal = document.getElementById("record-style-modal");
+const openRecordEffectModalBtn = document.getElementById("open-record-effect-modal");
 const closeRecordStyleModalBtn = document.getElementById("close-record-style-modal");
 const recordStyleGrid = document.getElementById("record-style-grid");
+const recordEffectModal = document.getElementById("record-effect-modal");
+const closeRecordEffectModalBtn = document.getElementById("close-record-effect-modal");
+const recordEffectGrid = document.getElementById("record-effect-grid");
 const trackArtInput = document.getElementById("track-art-input");
+const videoAddModal = document.getElementById("video-add-modal");
+const closeVideoAddBtn = document.getElementById("close-video-add");
+const videoAddFab = document.getElementById("video-add-fab");
+const videoLinkInput = document.getElementById("video-link-input");
+const videoTitleInput = document.getElementById("video-title-input");
+const saveVideoBtn = document.getElementById("save-video-btn");
+const videoSearchInput = document.getElementById("video-search-input");
+const videoTagFilterToggle = document.getElementById("video-tag-filter-toggle");
+const videoTagFilterPanel = document.getElementById("video-tag-filter-panel");
+const videoSelectedTags = document.getElementById("video-selected-tags");
+const videoAllTags = document.getElementById("video-all-tags");
+const videoGrid = document.getElementById("video-grid");
+const videoEmpty = document.getElementById("video-empty");
+const videoViewer = document.getElementById("video-viewer");
+const videoViewerBackdrop = document.getElementById("video-viewer-backdrop");
+const videoPlayerMainHost = document.getElementById("video-player-main-host");
+const videoPlayerMiniHost = document.getElementById("video-player-mini-host");
+const videoPlayerFrame = document.getElementById("video-player-frame");
+const videoEditorTitle = document.getElementById("video-editor-title");
+const videoEditorDescription = document.getElementById("video-editor-description");
+const videoSaveMetaBtn = document.getElementById("video-save-meta-btn");
+const videoTagInput = document.getElementById("video-tag-input");
+const videoAddTagBtn = document.getElementById("video-add-tag-btn");
+const videoCurrentTags = document.getElementById("video-current-tags");
+const videoCloseBtn = document.getElementById("video-close-btn");
+const videoMiniBtn = document.getElementById("video-mini-btn");
+const miniVideoPlayer = document.getElementById("mini-video-player");
+const miniVideoTitle = document.getElementById("mini-video-title");
+const miniVideoOpenBtn = document.getElementById("mini-video-open-btn");
+const miniVideoCloseBtn = document.getElementById("mini-video-close-btn");
 
 const youtubePlayerHost = document.getElementById("youtube-player-host");
 
@@ -87,11 +128,14 @@ const CURRENT_USER_KEY = "magnusCurrentUserV2";
 const SHORTCUTS_KEY = "magnusShortcutsV2";
 const MUSIC_LIBRARY_KEY_PREFIX = "musicLibraryMetaV3";
 const MUSIC_STATE_KEY_PREFIX = "musicStateV3";
+const VIDEO_LIBRARY_KEY_PREFIX = "videoLibraryV1";
 const MUSIC_DB_NAME = "magnusMusicDB";
 const MUSIC_STORE_NAME = "tracks";
 const DEFAULT_PLAYLIST_NAME = "기본 재생목록";
 
 let pendingProfilePic = null;
+let pendingBackgroundImage = null;
+let pendingBackgroundReset = false;
 let activeAudioUrl = null;
 let musicDbPromise = null;
 let guestTrackBlobs = new Map();
@@ -104,6 +148,8 @@ let playbackMonitorInterval = null;
 let isScrubbingPlayback = false;
 let pendingTrackArtTargetId = null;
 let playlistAnimationTimer = null;
+let activeDragState = null;
+let guestVideos = [];
 
 const RECORD_STYLE_OPTIONS = [
     { id: "classic", label: "클래식" },
@@ -111,6 +157,16 @@ const RECORD_STYLE_OPTIONS = [
     { id: "silver", label: "실버" },
     { id: "sunset", label: "선셋" }
 ];
+const RECORD_EFFECT_OPTIONS = [
+    { id: "none" },
+    { id: "rainbow-a" },
+    { id: "rainbow-b" },
+    { id: "rainbow-c" },
+    { id: "sky-glow" },
+    { id: "prism" }
+];
+const MAX_TRACK_ART_SIZE = 1024 * 1024 * 1.5;
+const MAX_BACKGROUND_IMAGE_SIZE = 1024 * 1024 * 4;
 
 let musicState = {
     library: [],
@@ -119,8 +175,16 @@ let musicState = {
     selectedTrackId: null,
     playingTrackId: null,
     globalRecordStyle: "classic",
+    recordEffect: "none",
     repeatEnabled: false,
     autoplayEnabled: false
+};
+let videoState = {
+    library: [],
+    search: "",
+    activeTags: [],
+    currentVideoId: null,
+    isMiniPlayer: false
 };
 
 window.onYouTubeIframeAPIReady = function() {
@@ -133,6 +197,8 @@ window.onload = async function() {
     renderShortcuts();
     bindCoreEvents();
     await initMusicPage();
+    initVideoPage();
+    initDraggablePanels();
 };
 
 function bindCoreEvents() {
@@ -141,6 +207,15 @@ function bindCoreEvents() {
 
     document.getElementById("profile-image-setup").onclick = () => imageInput.click();
     imageInput.onchange = handleProfileImageChange;
+    backgroundImageSetupBtn.onclick = () => backgroundImageInput.click();
+    backgroundImageInput.onchange = handleBackgroundImageChange;
+    resetBackgroundImageBtn.onclick = resetBackgroundImage;
+    applyHeaderWallpaperInput.onchange = () => {
+        const wallpaper = pendingBackgroundImage !== null
+            ? pendingBackgroundImage
+            : (getCurrentUser()?.backgroundImage || "");
+        applySiteWallpaper(wallpaper, applyHeaderWallpaperInput.checked);
+    };
 
     sidebarToggle.onclick = () => sidebar.classList.add("active");
     sidebarClose.onclick = () => sidebar.classList.remove("active");
@@ -155,6 +230,12 @@ function bindCoreEvents() {
         e.preventDefault();
         sidebar.classList.remove("active");
         showPage("music-page");
+    };
+
+    menuVideo.onclick = (e) => {
+        e.preventDefault();
+        sidebar.classList.remove("active");
+        showPage("video-page");
     };
 
     document.getElementById("nav-signup-btn").onclick = () => {
@@ -190,6 +271,8 @@ function loadSettings() {
     const currentUser = getCurrentUser();
     const savedColor = currentUser?.borderColor || "#000000";
     const isRainbow = Boolean(currentUser?.rainbowMode);
+    const wallpaperImage = currentUser?.backgroundImage || "";
+    const applyHeaderWallpaper = Boolean(currentUser?.applyHeaderWallpaper);
 
     if (currentUser) {
         document.getElementById("nav-signup-btn").classList.add("hidden");
@@ -211,7 +294,11 @@ function loadSettings() {
 
     rainbowMode.checked = isRainbow;
     borderColorInput.value = savedColor;
+    applyHeaderWallpaperInput.checked = applyHeaderWallpaper;
+    pendingBackgroundImage = null;
+    pendingBackgroundReset = false;
     applyBorderEffect(isRainbow, savedColor);
+    applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
 }
 
 function updateProfileDisplay(picData) {
@@ -243,6 +330,13 @@ function applyBorderEffect(isRainbow, color) {
     }
 }
 
+function applySiteWallpaper(imageData, applyToHeader) {
+    const hasWallpaper = Boolean(imageData);
+    document.body.classList.toggle("has-custom-wallpaper", hasWallpaper);
+    document.body.style.backgroundImage = hasWallpaper ? `url(${imageData})` : "";
+    pageHeader.style.backgroundImage = hasWallpaper && applyToHeader ? `url(${imageData})` : "";
+}
+
 function handleProfileImageChange(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -260,8 +354,35 @@ function handleProfileImageChange(e) {
     reader.readAsDataURL(file);
 }
 
+function handleBackgroundImageChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > MAX_BACKGROUND_IMAGE_SIZE) {
+        alert("배경화면 이미지는 4MB 이하로 업로드해주세요.");
+        event.target.value = "";
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        pendingBackgroundImage = ev.target.result;
+        pendingBackgroundReset = false;
+        applySiteWallpaper(pendingBackgroundImage, applyHeaderWallpaperInput.checked);
+    };
+    reader.readAsDataURL(file);
+    event.target.value = "";
+}
+
+function resetBackgroundImage() {
+    pendingBackgroundImage = "";
+    pendingBackgroundReset = true;
+    applyHeaderWallpaperInput.checked = false;
+    applySiteWallpaper("", false);
+}
+
 function showPage(pageId) {
-    ["main-page", "profile-page", "music-page"].forEach((id) => {
+    ["main-page", "profile-page", "music-page", "video-page"].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.classList.add("hidden");
     });
@@ -274,6 +395,9 @@ function showPage(pageId) {
 
     if (pageId === "music-page") {
         renderMusicUI();
+    }
+    if (pageId === "video-page") {
+        renderVideoUI();
     }
 }
 
@@ -293,7 +417,9 @@ function handleSignup() {
         pw,
         profilePic: "",
         borderColor: "#000000",
-        rainbowMode: false
+        rainbowMode: false,
+        backgroundImage: "",
+        applyHeaderWallpaper: false
     });
     saveUsers(users);
     localStorage.setItem(CURRENT_USER_KEY, id);
@@ -424,6 +550,12 @@ async function saveProfileSettings() {
         if (pendingProfilePic) users[currentIndex].profilePic = pendingProfilePic;
         users[currentIndex].rainbowMode = rainbowMode.checked;
         users[currentIndex].borderColor = borderColorInput.value;
+        if (pendingBackgroundReset) {
+            users[currentIndex].backgroundImage = "";
+        } else if (pendingBackgroundImage !== null) {
+            users[currentIndex].backgroundImage = pendingBackgroundImage;
+        }
+        users[currentIndex].applyHeaderWallpaper = applyHeaderWallpaperInput.checked && Boolean(users[currentIndex].backgroundImage);
 
         saveUsers(users);
         if (newId && newId !== previousUserId) {
@@ -469,6 +601,8 @@ function bindMusicEvents() {
     closeLibraryPickerBtn.onclick = () => libraryPickerModal.classList.add("hidden");
     recordStyleBtn.onclick = () => openRecordStyleModal();
     closeRecordStyleModalBtn.onclick = () => recordStyleModal.classList.add("hidden");
+    openRecordEffectModalBtn.onclick = () => openRecordEffectModal();
+    closeRecordEffectModalBtn.onclick = () => recordEffectModal.classList.add("hidden");
     trackArtInput.onchange = handleTrackArtUpload;
 
     playlistEditorSelect.onchange = () => {
@@ -523,6 +657,7 @@ async function loadMusicState() {
     musicState.selectedTrackId = savedState.selectedTrackId || null;
     musicState.playingTrackId = savedState.playingTrackId || null;
     musicState.globalRecordStyle = savedState.globalRecordStyle || "classic";
+    musicState.recordEffect = savedState.recordEffect || (savedState.rainbowReflectionEnabled ? "rainbow-a" : "none");
     musicState.repeatEnabled = Boolean(savedState.repeatEnabled);
     musicState.autoplayEnabled = Boolean(savedState.autoplayEnabled);
     if (!musicState.playlists.length) {
@@ -564,7 +699,9 @@ function migrateLegacyUserData() {
         pw: legacyPw,
         profilePic: localStorage.getItem("userProfilePic") || "",
         borderColor: localStorage.getItem("profileBorderColor") || "#000000",
-        rainbowMode: localStorage.getItem("rainbowMode") === "true"
+        rainbowMode: localStorage.getItem("rainbowMode") === "true",
+        backgroundImage: "",
+        applyHeaderWallpaper: false
     };
 
     saveUsers([migratedUser]);
@@ -654,18 +791,25 @@ function saveMusicState() {
     const libraryKey = getScopedMusicLibraryKey();
     const stateKey = getScopedMusicStateKey();
 
-    if (!libraryKey || !stateKey) return;
+    if (!libraryKey || !stateKey) return true;
 
-    localStorage.setItem(libraryKey, JSON.stringify(musicState.library));
-    localStorage.setItem(stateKey, JSON.stringify({
-        playlists: musicState.playlists,
-        currentPlaylistId: musicState.currentPlaylistId,
-        selectedTrackId: musicState.selectedTrackId,
-        playingTrackId: musicState.playingTrackId,
-        globalRecordStyle: musicState.globalRecordStyle,
-        repeatEnabled: musicState.repeatEnabled,
-        autoplayEnabled: musicState.autoplayEnabled
-    }));
+    try {
+        localStorage.setItem(libraryKey, JSON.stringify(musicState.library));
+        localStorage.setItem(stateKey, JSON.stringify({
+            playlists: musicState.playlists,
+            currentPlaylistId: musicState.currentPlaylistId,
+            selectedTrackId: musicState.selectedTrackId,
+            playingTrackId: musicState.playingTrackId,
+            globalRecordStyle: musicState.globalRecordStyle,
+            recordEffect: musicState.recordEffect,
+            repeatEnabled: musicState.repeatEnabled,
+            autoplayEnabled: musicState.autoplayEnabled
+        }));
+        return true;
+    } catch (error) {
+        console.error("Failed to save music state", error);
+        return false;
+    }
 }
 
 function openMusicAddModal() {
@@ -1859,12 +2003,14 @@ function clearRecordStyleClasses(element) {
 function applyRecordAppearance() {
     const selectedTrack = getTrackById(musicState.selectedTrackId) || getTrackById(musicState.playingTrackId);
     const styleId = getEffectiveRecordStyle(selectedTrack);
+    const effectId = musicState.recordEffect || "none";
 
     clearRecordStyleClasses(recordDisc);
     clearRecordStyleClasses(recordStylePreviewDisc);
 
     recordDisc.classList.add(`record-style-${styleId}`);
     recordStylePreviewDisc.classList.add(`record-style-${styleId}`);
+    applyRecordEffectClasses(recordDisc, effectId);
 
     if (selectedTrack?.customRecordArt) {
         recordDisc.style.setProperty("--custom-record-art", `url("${selectedTrack.customRecordArt}")`);
@@ -1916,6 +2062,101 @@ function setGlobalRecordStyle(styleId) {
     renderLibraryPickerIfVisible();
 }
 
+function clearRecordEffectClasses(element) {
+    element.classList.remove(
+        "effect-none",
+        "effect-rainbow-a",
+        "effect-rainbow-b",
+        "effect-rainbow-c",
+        "effect-sky-glow",
+        "effect-prism"
+    );
+}
+
+function applyRecordEffectClasses(element, effectId) {
+    clearRecordEffectClasses(element);
+    element.classList.add(`effect-${effectId}`);
+}
+
+function openRecordEffectModal() {
+    renderRecordEffectOptions();
+    recordEffectModal.classList.remove("hidden");
+}
+
+function renderRecordEffectOptions() {
+    const activeEffect = musicState.recordEffect || "none";
+    recordEffectGrid.innerHTML = "";
+
+    RECORD_EFFECT_OPTIONS.forEach((option) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "record-effect-option";
+        if (activeEffect === option.id) {
+            button.classList.add("is-active");
+        }
+
+        button.innerHTML = `
+            <span class="record-effect-preview">
+                <span class="record-effect-preview-disc effect-${option.id}"></span>
+            </span>
+        `;
+        button.onclick = () => setGlobalRecordEffect(option.id);
+        recordEffectGrid.appendChild(button);
+    });
+}
+
+function setGlobalRecordEffect(effectId) {
+    musicState.recordEffect = effectId;
+    saveMusicState();
+    renderRecordEffectOptions();
+    renderMusicUI();
+}
+
+function initDraggablePanels() {
+    document.querySelectorAll(".draggable-panel").forEach((panel) => {
+        const handle = panel.querySelector(".draggable-handle");
+        if (!handle) return;
+
+        handle.addEventListener("pointerdown", (event) => {
+            if (event.target.closest("button")) return;
+
+            const rect = panel.getBoundingClientRect();
+            panel.style.left = `${rect.left + rect.width / 2}px`;
+            panel.style.top = `${rect.top + rect.height / 2}px`;
+            panel.style.transform = "translate(-50%, -50%)";
+
+            activeDragState = {
+                panel,
+                offsetX: event.clientX - rect.left,
+                offsetY: event.clientY - rect.top
+            };
+
+            handle.setPointerCapture(event.pointerId);
+        });
+
+        handle.addEventListener("pointermove", (event) => {
+            if (!activeDragState || activeDragState.panel !== panel) return;
+
+            const nextLeft = event.clientX - activeDragState.offsetX;
+            const nextTop = event.clientY - activeDragState.offsetY;
+            const boundedLeft = Math.min(Math.max(nextLeft, 24), window.innerWidth - panel.offsetWidth - 24);
+            const boundedTop = Math.min(Math.max(nextTop, 120), window.innerHeight - panel.offsetHeight - 24);
+
+            panel.style.left = `${boundedLeft + panel.offsetWidth / 2}px`;
+            panel.style.top = `${boundedTop + panel.offsetHeight / 2}px`;
+        });
+
+        const stopDragging = () => {
+            if (activeDragState?.panel === panel) {
+                activeDragState = null;
+            }
+        };
+
+        handle.addEventListener("pointerup", stopDragging);
+        handle.addEventListener("pointercancel", stopDragging);
+    });
+}
+
 function requestTrackArtUpload(trackId) {
     pendingTrackArtTargetId = trackId;
     trackArtInput.value = "";
@@ -1926,11 +2167,22 @@ function handleTrackArtUpload(event) {
     const file = event.target.files?.[0];
     const targetTrack = getTrackById(pendingTrackArtTargetId);
     if (!file || !targetTrack) return;
+    if (file.size > MAX_TRACK_ART_SIZE) {
+        alert("음반 이미지는 1.5MB 이하만 업로드할 수 있습니다. 이미지 크기를 줄여서 다시 시도해주세요.");
+        return;
+    }
 
     const reader = new FileReader();
     reader.onload = () => {
+        const previousArt = targetTrack.customRecordArt || "";
         targetTrack.customRecordArt = String(reader.result || "");
-        saveMusicState();
+
+        if (!saveMusicState()) {
+            targetTrack.customRecordArt = previousArt;
+            alert("이미지 저장에 실패했습니다. 파일이 너무 크거나 브라우저 저장 공간이 부족할 수 있습니다.");
+            return;
+        }
+
         renderMusicUI();
         renderLibraryPickerIfVisible();
         if (!recordStyleModal.classList.contains("hidden") && musicState.selectedTrackId === targetTrack.id) {
@@ -1944,4 +2196,342 @@ function renderLibraryPickerIfVisible() {
     if (!libraryPickerModal.classList.contains("hidden")) {
         renderLibraryPicker();
     }
+}
+
+function getVideoLibraryKeyForUser(userId) {
+    return userId ? `${VIDEO_LIBRARY_KEY_PREFIX}:${userId}` : null;
+}
+
+function getScopedVideoLibraryKey() {
+    return getVideoLibraryKeyForUser(getCurrentUserId());
+}
+
+function initVideoPage() {
+    bindVideoEvents();
+    loadVideoState();
+    renderVideoUI();
+}
+
+function bindVideoEvents() {
+    videoAddFab.onclick = () => openVideoAddModal();
+    closeVideoAddBtn.onclick = () => videoAddModal.classList.add("hidden");
+    saveVideoBtn.onclick = () => saveVideoEntry();
+    videoSearchInput.addEventListener("input", () => {
+        videoState.search = videoSearchInput.value.trim().toLowerCase();
+        renderVideoUI();
+    });
+    videoTagFilterToggle.onclick = () => videoTagFilterPanel.classList.toggle("hidden");
+    videoEditorTitle.addEventListener("input", updateCurrentVideoMeta);
+    videoEditorDescription.addEventListener("input", updateCurrentVideoMeta);
+    videoSaveMetaBtn.onclick = () => saveCurrentVideoMeta();
+    videoAddTagBtn.onclick = () => addTagToCurrentVideo();
+    videoTagInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            addTagToCurrentVideo();
+        }
+    });
+    videoCloseBtn.onclick = () => closeVideoViewer(true);
+    videoMiniBtn.onclick = () => minimizeVideoViewer();
+    miniVideoOpenBtn.onclick = () => restoreMiniVideo();
+    miniVideoCloseBtn.onclick = () => closeVideoViewer(true);
+    videoViewerBackdrop.onclick = () => closeVideoViewer(true);
+    document.addEventListener("keydown", handleVideoViewerKeydown);
+}
+
+function loadVideoState() {
+    const key = getScopedVideoLibraryKey();
+    if (!key) {
+        videoState.library = guestVideos;
+        return;
+    }
+
+    const saved = JSON.parse(localStorage.getItem(key) || "[]");
+    videoState.library = Array.isArray(saved) ? saved : [];
+}
+
+function saveVideoState() {
+    const key = getScopedVideoLibraryKey();
+    if (!key) {
+        guestVideos = [...videoState.library];
+        return true;
+    }
+
+    try {
+        localStorage.setItem(key, JSON.stringify(videoState.library));
+        return true;
+    } catch (error) {
+        console.error("Failed to save video state", error);
+        return false;
+    }
+}
+
+function openVideoAddModal() {
+    videoLinkInput.value = "";
+    videoTitleInput.value = "";
+    videoAddModal.classList.remove("hidden");
+}
+
+async function saveVideoEntry() {
+    const youtubeUrl = videoLinkInput.value.trim();
+    const youtubeId = extractYouTubeId(youtubeUrl);
+    if (!youtubeId) {
+        alert("올바른 유튜브 링크를 입력해주세요.");
+        return;
+    }
+
+    let title = videoTitleInput.value.trim();
+    if (!title) {
+        title = await fetchYouTubeVideoTitle(youtubeUrl) || "유튜브 영상";
+    }
+
+    videoState.library.unshift({
+        id: createId("video"),
+        youtubeId,
+        youtubeUrl,
+        title,
+        description: "",
+        tags: []
+    });
+
+    saveVideoState();
+    videoAddModal.classList.add("hidden");
+    renderVideoUI();
+}
+
+async function fetchYouTubeVideoTitle(url) {
+    try {
+        const response = await fetch(`https://noembed.com/embed?url=${encodeURIComponent(url)}`);
+        if (!response.ok) return "";
+        const data = await response.json();
+        return data.title || "";
+    } catch {
+        return "";
+    }
+}
+
+function renderVideoUI() {
+    renderVideoGrid();
+    renderVideoTagFilters();
+    syncVideoViewer();
+}
+
+function getFilteredVideos() {
+    const selectedTags = videoState.activeTags;
+    const query = videoState.search;
+
+    return videoState.library.filter((video) => {
+        const haystack = `${video.title} ${video.description || ""} ${(video.tags || []).join(" ")}`.toLowerCase();
+        const matchesQuery = !query || haystack.includes(query);
+        const matchesTags = !selectedTags.length || selectedTags.every((tag) => (video.tags || []).includes(tag));
+        return matchesQuery && matchesTags;
+    });
+}
+
+function renderVideoGrid() {
+    const videos = getFilteredVideos();
+    videoGrid.innerHTML = "";
+
+    if (!videos.length) {
+        videoEmpty.classList.remove("hidden");
+        return;
+    }
+
+    videoEmpty.classList.add("hidden");
+    videos.forEach((video) => {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "video-card";
+        card.innerHTML = `
+            <div class="video-card-thumb">
+                <img src="https://img.youtube.com/vi/${video.youtubeId}/hqdefault.jpg" alt="${video.title}">
+                <div class="video-card-overlay">
+                    <div class="video-play-icon"><i class="fa-solid fa-play"></i></div>
+                </div>
+            </div>
+            <div class="video-card-body">
+                <div class="video-card-title">${escapeHtml(video.title)}</div>
+                <div class="video-card-description">${escapeHtml((video.description || "").slice(0, 80) || "설명이 없습니다.")}</div>
+                <div class="video-card-tags">${(video.tags || []).slice(0, 4).map((tag) => `<span class="video-card-tag">#${escapeHtml(tag)}</span>`).join("")}</div>
+            </div>
+        `;
+        card.onclick = (event) => {
+            event.stopPropagation();
+            openVideoViewer(video.id);
+        };
+        videoGrid.appendChild(card);
+    });
+}
+
+function renderVideoTagFilters() {
+    const allTags = [...new Set(videoState.library.flatMap((video) => video.tags || []))];
+    videoSelectedTags.innerHTML = "";
+    videoAllTags.innerHTML = "";
+
+    videoState.activeTags.forEach((tag) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "video-tag-chip is-active";
+        chip.textContent = `#${tag}`;
+        chip.onclick = () => toggleVideoTagFilter(tag);
+        videoSelectedTags.appendChild(chip);
+    });
+
+    allTags.forEach((tag) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = `video-tag-chip${videoState.activeTags.includes(tag) ? " is-active" : ""}`;
+        chip.textContent = `#${tag}`;
+        chip.onclick = () => toggleVideoTagFilter(tag);
+        videoAllTags.appendChild(chip);
+    });
+}
+
+function toggleVideoTagFilter(tag) {
+    if (videoState.activeTags.includes(tag)) {
+        videoState.activeTags = videoState.activeTags.filter((item) => item !== tag);
+    } else {
+        videoState.activeTags = [...videoState.activeTags, tag];
+    }
+    renderVideoUI();
+}
+
+function openVideoViewer(videoId) {
+    videoState.currentVideoId = videoId;
+    videoState.isMiniPlayer = false;
+    attachVideoPlayer(videoPlayerMainHost, true);
+    videoViewer.classList.remove("hidden");
+    miniVideoPlayer.classList.add("hidden");
+    syncVideoViewer();
+}
+
+function attachVideoPlayer(host, autoplay) {
+    const currentVideo = getCurrentVideo();
+    if (!host || !currentVideo) return;
+    const src = `https://www.youtube.com/embed/${currentVideo.youtubeId}?autoplay=${autoplay ? 1 : 0}&rel=0&modestbranding=1`;
+    if (videoPlayerFrame.parentElement !== host) {
+        host.appendChild(videoPlayerFrame);
+    }
+    if (videoPlayerFrame.dataset.videoId !== currentVideo.youtubeId || videoPlayerFrame.src !== src) {
+        videoPlayerFrame.src = src;
+        videoPlayerFrame.dataset.videoId = currentVideo.youtubeId;
+    }
+    videoPlayerFrame.classList.remove("hidden");
+}
+
+function getCurrentVideo() {
+    return videoState.library.find((video) => video.id === videoState.currentVideoId) || null;
+}
+
+function syncVideoViewer() {
+    const currentVideo = getCurrentVideo();
+    if (!currentVideo) {
+        videoViewer.classList.add("hidden");
+        if (!videoState.isMiniPlayer) {
+            miniVideoPlayer.classList.add("hidden");
+        }
+        return;
+    }
+
+    videoEditorTitle.value = currentVideo.title || "";
+    videoEditorDescription.value = currentVideo.description || "";
+    miniVideoTitle.textContent = currentVideo.title || "영상 재생 중";
+    renderCurrentVideoTags();
+
+    if (videoState.isMiniPlayer) {
+        attachVideoPlayer(videoPlayerMiniHost, true);
+        miniVideoPlayer.classList.remove("hidden");
+        videoViewer.classList.add("hidden");
+    } else {
+        attachVideoPlayer(videoPlayerMainHost, true);
+        videoViewer.classList.remove("hidden");
+    }
+}
+
+function renderCurrentVideoTags() {
+    const currentVideo = getCurrentVideo();
+    videoCurrentTags.innerHTML = "";
+    if (!currentVideo) return;
+
+    (currentVideo.tags || []).forEach((tag) => {
+        const chip = document.createElement("span");
+        chip.className = "video-current-tag";
+        chip.innerHTML = `#${escapeHtml(tag)} <button type="button" aria-label="태그 삭제"><i class="fa-solid fa-xmark"></i></button>`;
+        chip.querySelector("button").onclick = () => removeTagFromCurrentVideo(tag);
+        videoCurrentTags.appendChild(chip);
+    });
+}
+
+function updateCurrentVideoMeta() {
+    const currentVideo = getCurrentVideo();
+    if (!currentVideo) return;
+
+    currentVideo.title = videoEditorTitle.value.trim() || currentVideo.title;
+    currentVideo.description = videoEditorDescription.value.trim();
+    renderVideoGrid();
+    miniVideoTitle.textContent = currentVideo.title;
+}
+
+function saveCurrentVideoMeta() {
+    updateCurrentVideoMeta();
+    saveVideoState();
+}
+
+function addTagToCurrentVideo() {
+    const currentVideo = getCurrentVideo();
+    const tag = videoTagInput.value.trim();
+    if (!currentVideo || !tag) return;
+
+    currentVideo.tags = [...new Set([...(currentVideo.tags || []), tag])];
+    videoTagInput.value = "";
+    saveVideoState();
+    renderCurrentVideoTags();
+    renderVideoUI();
+}
+
+function removeTagFromCurrentVideo(tag) {
+    const currentVideo = getCurrentVideo();
+    if (!currentVideo) return;
+    currentVideo.tags = (currentVideo.tags || []).filter((item) => item !== tag);
+    saveVideoState();
+    renderCurrentVideoTags();
+    renderVideoUI();
+}
+
+function minimizeVideoViewer() {
+    videoState.isMiniPlayer = true;
+    syncVideoViewer();
+}
+
+function restoreMiniVideo() {
+    videoState.isMiniPlayer = false;
+    syncVideoViewer();
+}
+
+function closeVideoViewer(clearCurrent) {
+    videoPlayerFrame.src = "";
+    delete videoPlayerFrame.dataset.videoId;
+    videoPlayerFrame.classList.add("hidden");
+    videoViewer.classList.add("hidden");
+    miniVideoPlayer.classList.add("hidden");
+    if (clearCurrent) {
+        videoState.currentVideoId = null;
+        videoState.isMiniPlayer = false;
+    }
+}
+
+function handleVideoViewerKeydown(event) {
+    if (event.key !== "Escape") return;
+    if (videoViewer.classList.contains("hidden")) return;
+    if (videoState.isMiniPlayer) return;
+    closeVideoViewer(true);
+}
+
+function escapeHtml(value) {
+    return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
 }

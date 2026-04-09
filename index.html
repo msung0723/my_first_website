@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magnus Dashboard</title>
+    <title>Magnus</title>
+    <link rel="icon" type="image/png" href="M.png">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -23,6 +24,7 @@
                     <img id="header-profile-img" src="" alt="Profile" class="hidden">
                 </div>
                 <button id="nav-profile-btn" class="nav-btn" type="button">프로필</button>
+                <button id="nav-logout-btn" class="nav-btn gray" type="button">로그아웃</button>
             </div>
         </div>
     </header>
@@ -76,11 +78,44 @@
                 <input type="text" id="playlist-name-input" class="large-input" placeholder="재생목록 이름">
             </div>
             <div class="playlist-editor-actions">
+                <button id="open-library-picker-btn" class="nav-btn" type="button">보관함에서 노래 선택</button>
                 <button id="new-playlist-btn" class="nav-btn" type="button">새 재생목록</button>
                 <button id="rename-playlist-btn" class="nav-btn" type="button">이름 저장</button>
                 <button id="delete-playlist-btn" class="nav-btn gray" type="button">재생목록 삭제</button>
             </div>
             <div class="playlist-edit-list" id="playlist-edit-list"></div>
+        </div>
+    </div>
+
+    <div id="music-add-modal" class="hidden auth-overlay">
+        <div class="auth-box music-add-box">
+            <div class="playlist-editor-header">
+                <h2>노래 추가</h2>
+                <button id="close-music-add" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="music-source-switch">
+                <button id="music-source-youtube" class="nav-btn is-active" type="button">유튜브 링크로 추가</button>
+                <button id="music-source-file" class="nav-btn" type="button">mp3로 추가</button>
+            </div>
+            <input type="text" id="music-title-input" class="large-input" placeholder="노래 제목">
+            <div id="youtube-source-panel" class="music-source-panel">
+                <input type="text" id="youtube-link-input" class="large-input" placeholder="유튜브 링크">
+                <p class="music-source-note">유튜브에서 음악이 삭제될 시 오류가 발생할 수 있습니다.</p>
+            </div>
+            <div id="file-source-panel" class="music-source-panel hidden">
+                <input type="file" id="music-file-input" accept="audio/mpeg,audio/mp3,audio/*" class="large-input">
+            </div>
+            <button id="save-music-btn" class="large-btn" type="button">추가하기</button>
+        </div>
+    </div>
+
+    <div id="library-picker-modal" class="hidden auth-overlay">
+        <div class="auth-box playlist-editor-box">
+            <div class="playlist-editor-header">
+                <h2>보관함에서 노래 선택</h2>
+                <button id="close-library-picker" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="playlist-edit-list" id="library-picker-list"></div>
         </div>
     </div>
 
@@ -136,7 +171,6 @@
     <section id="music-page" class="hidden">
         <div class="music-layout">
             <div class="music-top-actions">
-                <input type="file" id="music-file-input" accept="audio/*" multiple class="hidden">
                 <button id="add-music-btn" class="nav-btn" type="button">노래 추가</button>
                 <button id="edit-playlist-btn" class="nav-btn" type="button">재생목록 수정</button>
             </div>
@@ -179,6 +213,9 @@
         </div>
 
         <audio id="music-audio" preload="metadata"></audio>
+        <div id="youtube-player-host" class="hidden">
+            <div id="youtube-player"></div>
+        </div>
     </section>
 
     <script src="script.js"></script>

@@ -591,6 +591,18 @@ function getScopedTrackStorageKey(trackId) {
     return getTrackStorageKeyForUser(getCurrentUserId(), trackId);
 }
 
+function getLegacyTrackStorageKeys(trackId) {
+    const currentUserId = getCurrentUserId();
+    const candidates = [
+        getScopedTrackStorageKey(trackId),
+        trackId,
+        currentUserId ? `${currentUserId}:${trackId}` : null,
+        currentUserId ? `${currentUserId}-${trackId}` : null
+    ];
+
+    return [...new Set(candidates.filter(Boolean))];
+}
+
 function getCurrentPlaylist() {
     return musicState.playlists.find((playlist) => playlist.id === musicState.currentPlaylistId) || null;
 }
@@ -769,11 +781,18 @@ async function toggleCurrentPlayback(track) {
         const state = typeof player.getPlayerState === "function"
             ? player.getPlayerState()
             : window.YT.PlayerState.UNSTARTED;
+        const currentVideoId = typeof player.getVideoData === "function"
+            ? player.getVideoData()?.video_id || ""
+            : "";
 
         if (state === window.YT.PlayerState.PLAYING) {
             player.pauseVideo();
+        } else if (state === window.YT.PlayerState.PAUSED && currentVideoId === track.youtubeId) {
+            youtubePlayerHost.classList.remove("hidden");
+            player.playVideo();
         } else {
             youtubePlayerHost.classList.remove("hidden");
+            player.loadVideoById(track.youtubeId);
             player.playVideo();
         }
 
@@ -1288,11 +1307,12 @@ async function saveTrackBlob(trackId, blob) {
     }
 
     const db = await openMusicDb();
-    const storageKey = getScopedTrackStorageKey(trackId);
+    const storageKeys = getLegacyTrackStorageKeys(trackId);
 
     return new Promise((resolve, reject) => {
         const transaction = db.transaction(MUSIC_STORE_NAME, "readwrite");
-        transaction.objectStore(MUSIC_STORE_NAME).put(blob, storageKey);
+        const store = transaction.objectStore(MUSIC_STORE_NAME);
+        storageKeys.forEach((storageKey) => store.put(blob, storageKey));
         transaction.oncomplete = () => resolve();
         transaction.onerror = () => reject(transaction.error);
     });
@@ -1304,14 +1324,20 @@ async function getTrackBlob(trackId) {
     }
 
     const db = await openMusicDb();
-    const storageKey = getScopedTrackStorageKey(trackId);
+    const storageKeys = getLegacyTrackStorageKeys(trackId);
 
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(MUSIC_STORE_NAME, "readonly");
-        const request = transaction.objectStore(MUSIC_STORE_NAME).get(storageKey);
-        request.onsuccess = () => resolve(request.result || null);
-        request.onerror = () => reject(request.error);
-    });
+    for (const storageKey of storageKeys) {
+        const blob = await new Promise((resolve, reject) => {
+            const transaction = db.transaction(MUSIC_STORE_NAME, "readonly");
+            const request = transaction.objectStore(MUSIC_STORE_NAME).get(storageKey);
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error);
+        });
+
+        if (blob) return blob;
+    }
+
+    return null;
 }
 
 async function handleRecordInteraction() {

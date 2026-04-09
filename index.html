@@ -119,6 +119,17 @@
         </div>
     </div>
 
+    <div id="record-style-modal" class="hidden auth-overlay">
+        <div class="auth-box playlist-editor-box">
+            <div class="playlist-editor-header">
+                <h2></h2>
+                <button id="close-record-style-modal" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="record-style-grid" id="record-style-grid"></div>
+        </div>
+    </div>
+    <input type="file" id="track-art-input" accept="image/*" class="hidden">
+
     <main id="main-page" class="welcome-container">
         <div class="main-content">
             <img src="19155.png" alt="Magnus Logo" class="main-center-logo">
@@ -170,15 +181,11 @@
 
     <section id="music-page" class="hidden">
         <div class="music-layout">
-            <div class="music-top-actions">
-                <button id="add-music-btn" class="nav-btn" type="button">노래 추가</button>
-                <button id="edit-playlist-btn" class="nav-btn" type="button">재생목록 수정</button>
-            </div>
-
             <div class="music-center">
                 <span class="now-playing-label">Now Playing</span>
                 <div class="record-wrapper">
                     <button class="record-disc" id="record-disc" type="button" aria-label="선택한 음악 재생">
+                        <div class="record-cover-art" id="record-cover-art"></div>
                         <div class="cd-shine"></div>
                         <div class="record-label">
                             <div class="label-dot"></div>
@@ -208,6 +215,15 @@
             </div>
 
             <div class="music-playlist">
+                <button id="record-style-btn" class="record-style-btn" type="button">
+                    <span class="record-style-preview" id="record-style-preview">
+                        <span class="record-style-preview-disc" id="record-style-preview-disc"></span>
+                    </span>
+                </button>
+                <div class="music-top-actions">
+                    <button id="add-music-btn" class="nav-btn" type="button">노래 추가</button>
+                    <button id="edit-playlist-btn" class="nav-btn" type="button">재생목록 수정</button>
+                </div>
                 <div class="playlist-switcher">
                     <button class="playlist-switch-btn" id="playlist-prev" type="button" aria-label="이전 재생목록">
                         <i class="fa-solid fa-chevron-left"></i>

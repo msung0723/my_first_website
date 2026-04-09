@@ -118,6 +118,7 @@ let musicState = {
     currentPlaylistId: null,
     selectedTrackId: null,
     playingTrackId: null,
+    globalRecordStyle: "classic",
     repeatEnabled: false,
     autoplayEnabled: false
 };
@@ -521,6 +522,7 @@ async function loadMusicState() {
     musicState.currentPlaylistId = savedState.currentPlaylistId || null;
     musicState.selectedTrackId = savedState.selectedTrackId || null;
     musicState.playingTrackId = savedState.playingTrackId || null;
+    musicState.globalRecordStyle = savedState.globalRecordStyle || "classic";
     musicState.repeatEnabled = Boolean(savedState.repeatEnabled);
     musicState.autoplayEnabled = Boolean(savedState.autoplayEnabled);
     if (!musicState.playlists.length) {
@@ -660,6 +662,7 @@ function saveMusicState() {
         currentPlaylistId: musicState.currentPlaylistId,
         selectedTrackId: musicState.selectedTrackId,
         playingTrackId: musicState.playingTrackId,
+        globalRecordStyle: musicState.globalRecordStyle,
         repeatEnabled: musicState.repeatEnabled,
         autoplayEnabled: musicState.autoplayEnabled
     }));
@@ -1840,7 +1843,7 @@ function renderLibraryPicker() {
 
 function getEffectiveRecordStyle(track) {
     if (!track) return "classic";
-    return track.customRecordArt ? "custom" : (track.recordStyle || "classic");
+    return track.customRecordArt ? "custom" : (musicState.globalRecordStyle || "classic");
 }
 
 function clearRecordStyleClasses(element) {
@@ -1873,31 +1876,25 @@ function applyRecordAppearance() {
 }
 
 function updateRecordStyleButton() {
-    const selectedTrack = getTrackById(musicState.selectedTrackId);
-    recordStyleBtn.disabled = !selectedTrack;
+    recordStyleBtn.disabled = false;
+    recordStyleBtn.style.opacity = "1";
     applyRecordAppearance();
 }
 
 function openRecordStyleModal() {
-    const selectedTrack = getTrackById(musicState.selectedTrackId);
-    if (!selectedTrack) {
-        alert("먼저 음반 디자인을 바꿀 노래를 선택해주세요.");
-        return;
-    }
-
-    renderRecordStyleOptions(selectedTrack);
+    renderRecordStyleOptions();
     recordStyleModal.classList.remove("hidden");
 }
 
-function renderRecordStyleOptions(track) {
-    const activeStyle = getEffectiveRecordStyle(track);
+function renderRecordStyleOptions() {
+    const activeStyle = musicState.globalRecordStyle || "classic";
     recordStyleGrid.innerHTML = "";
 
     RECORD_STYLE_OPTIONS.forEach((option) => {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "record-style-option";
-        if (activeStyle === option.id && !track.customRecordArt) {
+        if (activeStyle === option.id) {
             button.classList.add("is-active");
         }
 
@@ -1906,19 +1903,15 @@ function renderRecordStyleOptions(track) {
                 <span class="record-style-preview-disc record-style-${option.id}"></span>
             </span>
         `;
-        button.onclick = () => setSelectedTrackRecordStyle(option.id);
+        button.onclick = () => setGlobalRecordStyle(option.id);
         recordStyleGrid.appendChild(button);
     });
 }
 
-function setSelectedTrackRecordStyle(styleId) {
-    const selectedTrack = getTrackById(musicState.selectedTrackId);
-    if (!selectedTrack) return;
-
-    selectedTrack.recordStyle = styleId;
-    selectedTrack.customRecordArt = "";
+function setGlobalRecordStyle(styleId) {
+    musicState.globalRecordStyle = styleId;
     saveMusicState();
-    renderRecordStyleOptions(selectedTrack);
+    renderRecordStyleOptions();
     renderMusicUI();
     renderLibraryPickerIfVisible();
 }
@@ -1937,12 +1930,11 @@ function handleTrackArtUpload(event) {
     const reader = new FileReader();
     reader.onload = () => {
         targetTrack.customRecordArt = String(reader.result || "");
-        targetTrack.recordStyle = "custom";
         saveMusicState();
         renderMusicUI();
         renderLibraryPickerIfVisible();
         if (!recordStyleModal.classList.contains("hidden") && musicState.selectedTrackId === targetTrack.id) {
-            renderRecordStyleOptions(targetTrack);
+            renderRecordStyleOptions();
         }
     };
     reader.readAsDataURL(file);

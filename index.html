@@ -23,7 +23,7 @@
                     <div id="default-avatar">?</div>
                     <img id="header-profile-img" src="" alt="Profile" class="hidden">
                 </div>
-                <button id="nav-profile-btn" class="nav-btn" type="button">프로필</button>
+                <button id="nav-profile-btn" class="nav-btn" type="button">설정</button>
                 <button id="nav-logout-btn" class="nav-btn gray" type="button">로그아웃</button>
             </div>
         </div>
@@ -157,60 +157,242 @@
 
     <main id="main-page" class="welcome-container">
         <div class="main-content">
-            <img src="19155.png" alt="Magnus Logo" class="main-center-logo">
-            <h1 class="welcome-text"><span id="user-name">아무개</span>님 환영합니다</h1>
+            <div class="main-logo-wrap" id="main-logo-wrap">
+                <img src="19155.png" alt="Magnus Logo" class="main-center-logo" id="main-center-logo">
+                <button id="main-logo-delete-btn" class="main-custom-delete" type="button">×</button>
+                <div id="logo-neon-hover-panel" class="logo-neon-hover-panel hidden">
+                    <span>로고 네온</span>
+                    <input type="color" id="logo-neon-hover-color" value="#62e7ff" aria-label="로고 네온 색상">
+                </div>
+            </div>
+            <h1 class="welcome-text" id="welcome-text">
+                <span id="user-name" class="editable-welcome" tabindex="0" role="button" aria-label="환영 문구 수정">아무개님 환영합니다</span>
+                <button id="welcome-delete-btn" class="main-custom-delete" type="button">×</button>
+            </h1>
             <div id="shortcut-grid" class="shortcut-grid">
                 <button id="add-shortcut-btn" class="add-btn" type="button"><i class="fa-solid fa-plus"></i></button>
             </div>
+            <div id="main-custom-layer" class="main-custom-layer"></div>
+        </div>
+        <div id="main-edit-controls" class="main-edit-controls">
+            <button id="main-edit-start-btn" class="nav-btn" type="button">수정</button>
+            <button id="main-edit-save-btn" class="nav-btn hidden" type="button">수정 완료하기</button>
+            <button id="main-edit-cancel-btn" class="nav-btn gray hidden" type="button">취소하기</button>
+            <button id="main-edit-reset-btn" class="nav-btn gray hidden" type="button">기본 상태로 되돌리기</button>
+        </div>
+        <div class="main-preset-controls">
+            <button id="main-preset-toggle-btn" class="nav-btn" type="button">프리셋</button>
+            <div id="main-preset-panel" class="main-preset-panel hidden">
+                <div class="main-preset-slot" data-slot="0">
+                    <strong>프리셋 1</strong>
+                    <div class="main-preset-actions">
+                        <button class="nav-btn preset-save-btn" data-slot="0" type="button">저장</button>
+                        <button class="nav-btn gray preset-apply-btn" data-slot="0" type="button">불러오기</button>
+                    </div>
+                </div>
+                <div class="main-preset-slot" data-slot="1">
+                    <strong>프리셋 2</strong>
+                    <div class="main-preset-actions">
+                        <button class="nav-btn preset-save-btn" data-slot="1" type="button">저장</button>
+                        <button class="nav-btn gray preset-apply-btn" data-slot="1" type="button">불러오기</button>
+                    </div>
+                </div>
+                <div class="main-preset-slot" data-slot="2">
+                    <strong>프리셋 3</strong>
+                    <div class="main-preset-actions">
+                        <button class="nav-btn preset-save-btn" data-slot="2" type="button">저장</button>
+                        <button class="nav-btn gray preset-apply-btn" data-slot="2" type="button">불러오기</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
+    <div id="main-edit-context-menu" class="main-edit-context-menu hidden">
+        <button id="main-add-text-btn" type="button">문구 추가하기</button>
+        <button id="main-add-image-btn" type="button">이미지 추가하기</button>
+    </div>
+    <input type="file" id="main-custom-image-input" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden">
+    <div id="main-size-toolbar" class="main-size-toolbar hidden">
+        <span id="main-size-toolbar-label">크기</span>
+        <input id="main-size-range" type="range" min="40" max="220" step="1" value="100">
+        <button id="main-size-delete-btn" class="nav-btn gray hidden" type="button">삭제</button>
+    </div>
+
+    <div id="welcome-toolbar" class="welcome-toolbar draggable-panel hidden" data-draggable-panel="welcome-toolbar">
+        <div class="welcome-toolbar-header draggable-handle">
+            <span>도구 창</span>
+        </div>
+        <div class="welcome-toolbar-body">
+            <label class="welcome-tool">
+                <span>글자색</span>
+                <input type="color" id="welcome-text-color" value="#111111">
+            </label>
+            <label class="welcome-tool">
+                <span>크기</span>
+                <input type="range" id="welcome-font-size" min="24" max="84" step="1" value="40">
+            </label>
+            <label class="welcome-tool">
+                <span>테두리</span>
+                <input type="color" id="welcome-stroke-color" value="#111111">
+            </label>
+            <label class="welcome-tool">
+                <span>폰트</span>
+                <select id="welcome-font-family">
+                    <option value="'Noto Sans KR', sans-serif">기본</option>
+                    <option value="'Nanum Gothic', sans-serif">나눔고딕</option>
+                    <option value="'Gowun Dodum', sans-serif">고운돋움</option>
+                    <option value="'Do Hyeon', sans-serif">도현</option>
+                    <option value="'Malgun Gothic', sans-serif">맑은 고딕</option>
+                    <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                    <option value="'Georgia', serif">Georgia</option>
+                    <option value="'Courier New', monospace">Courier</option>
+                </select>
+            </label>
+            <label class="checkbox-label welcome-tool-checkbox">
+                <input type="checkbox" id="welcome-neon-toggle">
+                네온 효과
+            </label>
+        </div>
+    </div>
+    <button id="welcome-toolbar-reset" class="welcome-toolbar-reset hidden" type="button">위치 되돌리기</button>
+    <div id="shortcut-toolbar" class="welcome-toolbar shortcut-toolbar hidden">
+        <div class="welcome-toolbar-header">
+            <span>즐겨찾기 텍스트</span>
+        </div>
+        <div class="welcome-toolbar-body">
+            <label class="welcome-tool">
+                <span>글자색</span>
+                <input type="color" id="shortcut-text-color" value="#333333">
+            </label>
+            <label class="welcome-tool">
+                <span>크기</span>
+                <input type="range" id="shortcut-font-size" min="10" max="36" step="1" value="13">
+            </label>
+            <label class="welcome-tool">
+                <span>테두리</span>
+                <input type="color" id="shortcut-stroke-color" value="#333333">
+            </label>
+            <label class="welcome-tool">
+                <span>폰트</span>
+                <select id="shortcut-font-family">
+                    <option value="'Noto Sans KR', sans-serif">기본</option>
+                    <option value="'Nanum Gothic', sans-serif">나눔고딕</option>
+                    <option value="'Gowun Dodum', sans-serif">고운돋움</option>
+                    <option value="'Do Hyeon', sans-serif">도현</option>
+                    <option value="'Malgun Gothic', sans-serif">맑은 고딕</option>
+                    <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                    <option value="'Georgia', serif">Georgia</option>
+                    <option value="'Courier New', monospace">Courier</option>
+                </select>
+            </label>
+            <label class="checkbox-label welcome-tool-checkbox">
+                <input type="checkbox" id="shortcut-neon-toggle">
+                네온 효과
+            </label>
+        </div>
+    </div>
+
+    <div id="profile-crop-modal" class="hidden auth-overlay">
+        <div class="auth-box profile-crop-box">
+            <div class="playlist-editor-header">
+                <h2>프로필 사진 조정</h2>
+                <button id="close-profile-crop" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="profile-crop-stage" class="profile-crop-stage">
+                <img id="profile-crop-image" alt="Profile Crop Preview">
+                <div class="profile-crop-mask"></div>
+            </div>
+            <label class="setting-item">
+                <span>확대</span>
+                <input id="profile-crop-zoom" type="range" min="1" max="3" step="0.01" value="1">
+            </label>
+            <div class="button-group">
+                <button id="save-profile-crop" class="large-btn" type="button">프로필로 사용하기</button>
+            </div>
+        </div>
+    </div>
 
     <section id="profile-page" class="hidden">
         <div class="profile-container">
-            <h2 class="section-title">계정 설정</h2>
-            <div class="profile-layout">
-                <div class="profile-left">
-                    <div id="profile-image-setup" class="image-upload-box">
-                        <i class="fa-solid fa-plus" id="preview-plus"></i>
-                        <img id="profile-preview" src="" alt="Profile Preview" class="hidden">
-                        <input type="file" id="image-input" accept="image/*" class="hidden">
+            <h2 class="section-title">설정</h2>
+            <div class="settings-tab-bar">
+                <button id="settings-tab-account" class="settings-tab is-active" type="button">계정 설정</button>
+                <button id="settings-tab-environment" class="settings-tab" type="button">환경 설정</button>
+            </div>
+            <div id="settings-panel-account" class="settings-panel is-active">
+                <div class="profile-layout">
+                    <div class="profile-left">
+                        <div id="profile-image-setup" class="image-upload-box">
+                            <i class="fa-solid fa-plus" id="preview-plus"></i>
+                            <img id="profile-preview" src="" alt="Profile Preview" class="hidden">
+                            <input type="file" id="image-input" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden">
+                        </div>
+                        <p class="info-text">사진을 눌러 변경하세요. 드래그와 확대 후 원형 프로필에 맞춰 저장할 수 있습니다.</p>
+                        <p class="info-text">GIF/WebP 움직이는 이미지 사용 가능, 최대 8MB까지 업로드할 수 있습니다.</p>
+                        <div id="profile-image-library" class="image-history-list"></div>
+                        <div class="setting-item">
+                            <label>테두리 색상</label>
+                            <input type="color" id="profile-border-color" value="#000000">
+                        </div>
+                        <div class="setting-item">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="rainbow-mode"> 무지개 애니메이션
+                            </label>
+                        </div>
                     </div>
-                    <p class="info-text">사진을 눌러 변경하세요</p>
-                    <div class="setting-item">
-                        <label>테두리 색상</label>
-                        <input type="color" id="profile-border-color" value="#000000">
+                    <div class="profile-right">
+                        <div class="input-group">
+                            <label>이름 변경</label>
+                            <input type="text" id="change-id" class="large-input" placeholder="새로운 이름 입력">
+                        </div>
+                        <div class="input-group">
+                            <label>비밀번호 변경</label>
+                            <input type="password" id="change-pw" class="large-input" placeholder="새로운 비밀번호 입력">
+                        </div>
                     </div>
-                    <div class="setting-item">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="rainbow-mode"> 무지개 애니메이션
-                        </label>
+                </div>
+            </div>
+            <div id="settings-panel-environment" class="settings-panel hidden">
+                <div class="environment-grid">
+                    <div class="environment-card">
+                        <h3>배경화면</h3>
+                        <div class="setting-item wallpaper-setting">
+                            <label>배경화면 설정</label>
+                            <p class="info-text">권장 해상도는 1920x1080 이상입니다. GIF/WebP 움직이는 배경도 사용할 수 있습니다.</p>
+                            <p class="info-text">배경 이미지는 최대 12MB까지 업로드할 수 있습니다.</p>
+                            <div class="wallpaper-actions">
+                                <button id="background-image-setup" class="nav-btn" type="button">사진 업로드</button>
+                                <button id="reset-background-image" class="nav-btn gray" type="button">기본 이미지로 설정</button>
+                            </div>
+                            <div id="background-image-library" class="image-history-list"></div>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="apply-header-wallpaper"> 상단 바 적용
+                            </label>
+                            <input type="file" id="background-image-input" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden">
+                        </div>
                     </div>
-                    <div class="setting-item wallpaper-setting">
-                        <label>배경화면 설정</label>
-                        <div class="wallpaper-actions">
-                            <button id="background-image-setup" class="nav-btn" type="button">사진 업로드</button>
-                            <button id="reset-background-image" class="nav-btn gray" type="button">기본 이미지로 설정</button>
+                    <div class="environment-card">
+                        <h3>마우스 포인터</h3>
+                        <div class="setting-item">
+                            <label>포인터 모양</label>
+                            <select id="cursor-style-select" class="large-input">
+                                <option value="default">기본</option>
+                                <option value="pointer">손가락</option>
+                                <option value="crosshair">십자선</option>
+                                <option value="grab">잡기</option>
+                                <option value="cell">셀</option>
+                                <option value="help">도움말</option>
+                            </select>
                         </div>
                         <label class="checkbox-label">
-                            <input type="checkbox" id="apply-header-wallpaper"> 상단 바 적용
+                            <input type="checkbox" id="show-shortcuts-toggle" checked> 즐겨찾기 보이기
                         </label>
-                        <input type="file" id="background-image-input" accept="image/*" class="hidden">
                     </div>
                 </div>
-                <div class="profile-right">
-                    <div class="input-group">
-                        <label>이름 변경</label>
-                        <input type="text" id="change-id" class="large-input" placeholder="새로운 이름 입력">
-                    </div>
-                    <div class="input-group">
-                        <label>비밀번호 변경</label>
-                        <input type="password" id="change-pw" class="large-input" placeholder="새로운 비밀번호 입력">
-                    </div>
-                    <div class="button-group">
-                        <button id="save-settings" class="large-btn" type="button">설정 저장하기</button>
-                        <button id="back-to-main" class="nav-btn gray" type="button">메인으로 돌아가기</button>
-                    </div>
-                </div>
+            </div>
+            <div class="button-group">
+                <button id="save-settings" class="large-btn" type="button">설정 저장하기</button>
+                <button id="back-to-main" class="nav-btn gray" type="button">메인으로 돌아가기</button>
             </div>
         </div>
     </section>

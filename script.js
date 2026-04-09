@@ -1,4 +1,18 @@
 const userNameDisplay = document.getElementById("user-name");
+const welcomeText = document.getElementById("welcome-text");
+const welcomeToolbar = document.getElementById("welcome-toolbar");
+const welcomeToolbarResetBtn = document.getElementById("welcome-toolbar-reset");
+const welcomeTextColorInput = document.getElementById("welcome-text-color");
+const welcomeFontSizeInput = document.getElementById("welcome-font-size");
+const welcomeStrokeColorInput = document.getElementById("welcome-stroke-color");
+const welcomeFontFamilySelect = document.getElementById("welcome-font-family");
+const welcomeNeonToggle = document.getElementById("welcome-neon-toggle");
+const shortcutToolbar = document.getElementById("shortcut-toolbar");
+const shortcutTextColorInput = document.getElementById("shortcut-text-color");
+const shortcutFontSizeInput = document.getElementById("shortcut-font-size");
+const shortcutStrokeColorInput = document.getElementById("shortcut-stroke-color");
+const shortcutFontFamilySelect = document.getElementById("shortcut-font-family");
+const shortcutNeonToggle = document.getElementById("shortcut-neon-toggle");
 const navProfileGroup = document.getElementById("nav-profile-group");
 const headerProfileImg = document.getElementById("header-profile-img");
 const defaultAvatar = document.getElementById("default-avatar");
@@ -10,16 +24,55 @@ const addShortcutBtn = document.getElementById("add-shortcut-btn");
 const shortcutModal = document.getElementById("shortcut-modal");
 const shortcutNameInput = document.getElementById("shortcut-name");
 const shortcutUrlInput = document.getElementById("shortcut-url");
+const mainEditControls = document.getElementById("main-edit-controls");
+const mainEditStartBtn = document.getElementById("main-edit-start-btn");
+const mainEditSaveBtn = document.getElementById("main-edit-save-btn");
+const mainEditCancelBtn = document.getElementById("main-edit-cancel-btn");
+const mainEditResetBtn = document.getElementById("main-edit-reset-btn");
+const mainContent = document.querySelector(".main-content");
+const mainCustomLayer = document.getElementById("main-custom-layer");
+const mainEditContextMenu = document.getElementById("main-edit-context-menu");
+const mainAddTextBtn = document.getElementById("main-add-text-btn");
+const mainAddImageBtn = document.getElementById("main-add-image-btn");
+const mainCustomImageInput = document.getElementById("main-custom-image-input");
+const mainSizeToolbar = document.getElementById("main-size-toolbar");
+const mainSizeToolbarLabel = document.getElementById("main-size-toolbar-label");
+const mainSizeRange = document.getElementById("main-size-range");
+const mainSizeDeleteBtn = document.getElementById("main-size-delete-btn");
+const mainLogoDeleteBtn = document.getElementById("main-logo-delete-btn");
+const welcomeDeleteBtn = document.getElementById("welcome-delete-btn");
+const mainPresetToggleBtn = document.getElementById("main-preset-toggle-btn");
+const mainPresetPanel = document.getElementById("main-preset-panel");
+const presetSaveButtons = document.querySelectorAll(".preset-save-btn");
+const presetApplyButtons = document.querySelectorAll(".preset-apply-btn");
 
 const profilePreview = document.getElementById("profile-preview");
 const previewPlus = document.getElementById("preview-plus");
 const imageInput = document.getElementById("image-input");
+const profileImageLibrary = document.getElementById("profile-image-library");
 const rainbowMode = document.getElementById("rainbow-mode");
 const borderColorInput = document.getElementById("profile-border-color");
 const backgroundImageSetupBtn = document.getElementById("background-image-setup");
 const resetBackgroundImageBtn = document.getElementById("reset-background-image");
 const backgroundImageInput = document.getElementById("background-image-input");
+const backgroundImageLibrary = document.getElementById("background-image-library");
 const applyHeaderWallpaperInput = document.getElementById("apply-header-wallpaper");
+const mainLogoWrap = document.getElementById("main-logo-wrap");
+const mainCenterLogo = document.getElementById("main-center-logo");
+const logoNeonHoverPanel = document.getElementById("logo-neon-hover-panel");
+const logoNeonHoverColorInput = document.getElementById("logo-neon-hover-color");
+const cursorStyleSelect = document.getElementById("cursor-style-select");
+const showShortcutsToggle = document.getElementById("show-shortcuts-toggle");
+const settingsTabAccount = document.getElementById("settings-tab-account");
+const settingsTabEnvironment = document.getElementById("settings-tab-environment");
+const settingsPanelAccount = document.getElementById("settings-panel-account");
+const settingsPanelEnvironment = document.getElementById("settings-panel-environment");
+const profileCropModal = document.getElementById("profile-crop-modal");
+const closeProfileCropBtn = document.getElementById("close-profile-crop");
+const profileCropStage = document.getElementById("profile-crop-stage");
+const profileCropImage = document.getElementById("profile-crop-image");
+const profileCropZoom = document.getElementById("profile-crop-zoom");
+const saveProfileCropBtn = document.getElementById("save-profile-crop");
 const pageHeader = document.querySelector("header");
 
 const sidebar = document.getElementById("sidebar");
@@ -134,8 +187,12 @@ const MUSIC_STORE_NAME = "tracks";
 const DEFAULT_PLAYLIST_NAME = "기본 재생목록";
 
 let pendingProfilePic = null;
+let pendingProfileCrop = null;
 let pendingBackgroundImage = null;
 let pendingBackgroundReset = false;
+let isEditingWelcomeText = false;
+let welcomeToolbarDefaultsApplied = false;
+let welcomeCompositionStart = null;
 let activeAudioUrl = null;
 let musicDbPromise = null;
 let guestTrackBlobs = new Map();
@@ -150,6 +207,20 @@ let pendingTrackArtTargetId = null;
 let playlistAnimationTimer = null;
 let activeDragState = null;
 let guestVideos = [];
+let profileCropDraft = null;
+let profileCropDragState = null;
+let isEditingShortcutText = false;
+let activeShortcutTextEl = null;
+let currentShortcutEditingId = null;
+let shortcutCompositionStart = null;
+let isMainEditMode = false;
+let mainEditSnapshot = null;
+let mainContextMenuPoint = { x: 50, y: 50 };
+let mainDragState = null;
+let activeCustomTextId = null;
+let customTextCompositionStart = null;
+let activeSizeTarget = null;
+let suppressMainEditClickUntil = 0;
 
 const RECORD_STYLE_OPTIONS = [
     { id: "classic", label: "클래식" },
@@ -166,7 +237,8 @@ const RECORD_EFFECT_OPTIONS = [
     { id: "prism" }
 ];
 const MAX_TRACK_ART_SIZE = 1024 * 1024 * 1.5;
-const MAX_BACKGROUND_IMAGE_SIZE = 1024 * 1024 * 4;
+const MAX_PROFILE_IMAGE_SIZE = 1024 * 1024 * 8;
+const MAX_BACKGROUND_IMAGE_SIZE = 1024 * 1024 * 12;
 
 let musicState = {
     library: [],
@@ -186,6 +258,8 @@ let videoState = {
     currentVideoId: null,
     isMiniPlayer: false
 };
+let currentWelcomeToolState = getDefaultWelcomeToolState();
+let currentShortcutToolState = getDefaultShortcutToolState();
 
 window.onYouTubeIframeAPIReady = function() {
     if (youtubeReadyResolver) youtubeReadyResolver();
@@ -207,6 +281,17 @@ function bindCoreEvents() {
 
     document.getElementById("profile-image-setup").onclick = () => imageInput.click();
     imageInput.onchange = handleProfileImageChange;
+    closeProfileCropBtn.onclick = () => closeProfileCropModal();
+    profileCropZoom.oninput = () => {
+        if (!profileCropDraft) return;
+        profileCropDraft.crop.scale = Number(profileCropZoom.value);
+        renderProfileCropStage();
+    };
+    saveProfileCropBtn.onclick = commitProfileCropSelection;
+    profileCropStage.addEventListener("pointerdown", handleProfileCropPointerDown);
+    profileCropStage.addEventListener("pointermove", handleProfileCropPointerMove);
+    profileCropStage.addEventListener("pointerup", stopProfileCropDragging);
+    profileCropStage.addEventListener("pointercancel", stopProfileCropDragging);
     backgroundImageSetupBtn.onclick = () => backgroundImageInput.click();
     backgroundImageInput.onchange = handleBackgroundImageChange;
     resetBackgroundImageBtn.onclick = resetBackgroundImage;
@@ -216,6 +301,62 @@ function bindCoreEvents() {
             : (getCurrentUser()?.backgroundImage || "");
         applySiteWallpaper(wallpaper, applyHeaderWallpaperInput.checked);
     };
+    mainLogoWrap.addEventListener("click", (event) => {
+        if (!isMainEditMode) return;
+        event.stopPropagation();
+        logoNeonHoverPanel.classList.toggle("hidden");
+    });
+    logoNeonHoverColorInput.oninput = () => {
+        applyLogoNeonColor(logoNeonHoverColorInput.value);
+        persistLogoNeonColor(logoNeonHoverColorInput.value);
+    };
+    logoNeonHoverColorInput.onchange = () => {
+        applyLogoNeonColor(logoNeonHoverColorInput.value);
+        persistLogoNeonColor(logoNeonHoverColorInput.value);
+    };
+    cursorStyleSelect.onchange = () => applyCursorStyle(cursorStyleSelect.value);
+    settingsTabAccount.onclick = () => switchSettingsTab("account");
+    settingsTabEnvironment.onclick = () => switchSettingsTab("environment");
+    userNameDisplay.onclick = () => {
+        if (!isMainEditMode) return;
+        if (Date.now() < suppressMainEditClickUntil) return;
+        startWelcomeTextEditing();
+    };
+    userNameDisplay.onkeydown = (event) => {
+        if (!isMainEditMode) return;
+        if (isEditingWelcomeText) return;
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            startWelcomeTextEditing();
+        }
+    };
+    userNameDisplay.addEventListener("beforeinput", handleWelcomeBeforeInput);
+    userNameDisplay.addEventListener("paste", handleWelcomePaste);
+    userNameDisplay.addEventListener("keydown", handleWelcomeEditorKeydown);
+    userNameDisplay.addEventListener("compositionstart", handleWelcomeCompositionStart);
+    userNameDisplay.addEventListener("compositionend", handleWelcomeCompositionEnd);
+    document.addEventListener("mousedown", handleWelcomeEditorOutsideClick);
+    document.addEventListener("mousedown", handleCustomTextOutsideClick);
+    welcomeToolbarResetBtn.onclick = resetWelcomeToolbarPosition;
+    welcomeTextColorInput.oninput = () => { currentWelcomeToolState.color = welcomeTextColorInput.value; };
+    welcomeFontSizeInput.oninput = () => { currentWelcomeToolState.fontSize = Number(welcomeFontSizeInput.value); };
+    welcomeStrokeColorInput.oninput = () => { currentWelcomeToolState.strokeColor = welcomeStrokeColorInput.value; };
+    welcomeFontFamilySelect.onchange = () => { currentWelcomeToolState.fontFamily = welcomeFontFamilySelect.value; };
+    welcomeNeonToggle.onchange = () => { currentWelcomeToolState.neon = welcomeNeonToggle.checked; };
+    document.addEventListener("mousedown", handleShortcutEditorOutsideClick);
+    shortcutTextColorInput.oninput = () => { currentShortcutToolState.color = shortcutTextColorInput.value; };
+    shortcutFontSizeInput.oninput = () => { currentShortcutToolState.fontSize = Number(shortcutFontSizeInput.value); };
+    shortcutStrokeColorInput.oninput = () => { currentShortcutToolState.strokeColor = shortcutStrokeColorInput.value; };
+    shortcutFontFamilySelect.onchange = () => { currentShortcutToolState.fontFamily = shortcutFontFamilySelect.value; };
+    shortcutNeonToggle.onchange = () => { currentShortcutToolState.neon = shortcutNeonToggle.checked; };
+    window.addEventListener("resize", () => {
+        if (isEditingWelcomeText && welcomeToolbar.classList.contains("hidden") === false) {
+            resetWelcomeToolbarPosition();
+        }
+        if (isEditingShortcutText && shortcutToolbar.classList.contains("hidden") === false) {
+            positionShortcutToolbarDefault();
+        }
+    });
 
     sidebarToggle.onclick = () => sidebar.classList.add("active");
     sidebarClose.onclick = () => sidebar.classList.remove("active");
@@ -249,8 +390,61 @@ function bindCoreEvents() {
     document.getElementById("complete-signup").onclick = handleSignup;
     document.getElementById("submit-login").onclick = handleLogin;
 
-    addShortcutBtn.onclick = () => shortcutModal.classList.remove("hidden");
+    addShortcutBtn.onclick = () => {
+        if (!isMainEditMode) return;
+        shortcutModal.classList.remove("hidden");
+    };
     document.getElementById("save-shortcut").onclick = saveShortcut;
+    mainEditStartBtn.onclick = enterMainEditMode;
+    mainEditSaveBtn.onclick = completeMainEditMode;
+    mainEditCancelBtn.onclick = cancelMainEditMode;
+    mainEditResetBtn.onclick = resetMainEditToDefault;
+    mainPresetToggleBtn.onclick = (event) => {
+        event.stopPropagation();
+        mainPresetPanel.classList.toggle("hidden");
+        renderMainPresetPanel();
+    };
+    presetSaveButtons.forEach((button) => {
+        button.onclick = () => saveMainPresetSlot(Number(button.dataset.slot));
+    });
+    presetApplyButtons.forEach((button) => {
+        button.onclick = () => applyMainPresetSlot(Number(button.dataset.slot));
+    });
+    mainContent.addEventListener("contextmenu", handleMainContentContextMenu);
+    mainAddTextBtn.onclick = addCustomTextAtContextPoint;
+    mainAddImageBtn.onclick = () => {
+        mainEditContextMenu.classList.add("hidden");
+        mainCustomImageInput.click();
+    };
+    mainCustomImageInput.onchange = handleCustomImagePick;
+    mainSizeRange.oninput = handleMainSizeChange;
+    mainSizeDeleteBtn.onclick = handleMainSizeDelete;
+    mainLogoWrap.addEventListener("pointerdown", (event) => handleMainItemPointerDown(event, "logo"));
+    welcomeText.addEventListener("pointerdown", (event) => handleMainItemPointerDown(event, "welcome"));
+    mainLogoDeleteBtn.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        deleteBaseMainItem("logo");
+    };
+    welcomeDeleteBtn.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        deleteBaseMainItem("welcome");
+    };
+    shortcutGrid.addEventListener("pointerdown", (event) => handleMainItemPointerDown(event, "shortcuts"));
+    shortcutGrid.addEventListener("click", (event) => {
+        if (!isMainEditMode) return;
+        if (Date.now() < suppressMainEditClickUntil) return;
+        if (event.target.closest(".editable-shortcut-text") || event.target.closest("#add-shortcut-btn")) return;
+        event.stopPropagation();
+        openSizeToolbarFor({ type: "shortcuts" }, event.clientX, event.clientY);
+    });
+    mainLogoWrap.addEventListener("click", (event) => {
+        if (!isMainEditMode) return;
+        if (Date.now() < suppressMainEditClickUntil) return;
+        event.stopPropagation();
+        openSizeToolbarFor({ type: "logo" }, event.clientX, event.clientY);
+    });
 
     const saveSettingsBtn = document.getElementById("save-settings");
     if (saveSettingsBtn) saveSettingsBtn.addEventListener("click", saveProfileSettings);
@@ -261,10 +455,24 @@ function bindCoreEvents() {
     document.getElementById("logo-main").onclick = () => showPage("main-page");
 
     window.onclick = (e) => {
+        if (!logoNeonHoverPanel.classList.contains("hidden") && !mainLogoWrap.contains(e.target)) {
+            logoNeonHoverPanel.classList.add("hidden");
+        }
+        if (!mainEditContextMenu.classList.contains("hidden") && !mainEditContextMenu.contains(e.target)) {
+            mainEditContextMenu.classList.add("hidden");
+        }
+        if (!mainPresetPanel.classList.contains("hidden") && !mainPresetPanel.contains(e.target) && !mainPresetToggleBtn.contains(e.target)) {
+            mainPresetPanel.classList.add("hidden");
+        }
+        if (!mainSizeToolbar.classList.contains("hidden") && !mainSizeToolbar.contains(e.target)) {
+            mainSizeToolbar.classList.add("hidden");
+        }
         if (e.target.classList.contains("auth-overlay")) {
             e.target.classList.add("hidden");
         }
     };
+    window.addEventListener("pointermove", handleMainItemPointerMove);
+    window.addEventListener("pointerup", stopMainItemDragging);
 }
 
 function loadSettings() {
@@ -273,21 +481,25 @@ function loadSettings() {
     const isRainbow = Boolean(currentUser?.rainbowMode);
     const wallpaperImage = currentUser?.backgroundImage || "";
     const applyHeaderWallpaper = Boolean(currentUser?.applyHeaderWallpaper);
+    const logoNeonColor = currentUser?.logoNeonColor || "#62e7ff";
+    const cursorStyle = currentUser?.cursorStyle || "default";
+    const showShortcuts = currentUser?.showShortcuts !== false;
+    const welcomeMessage = currentUser?.welcomeMessage || (currentUser ? `${currentUser.id}님 환영합니다` : "아무개님 환영합니다");
 
     if (currentUser) {
         document.getElementById("nav-signup-btn").classList.add("hidden");
         document.getElementById("nav-login-btn").classList.add("hidden");
         navProfileGroup.classList.remove("hidden");
-        userNameDisplay.innerText = currentUser.id;
+        userNameDisplay.innerText = welcomeMessage;
     } else {
         document.getElementById("nav-signup-btn").classList.remove("hidden");
         document.getElementById("nav-login-btn").classList.remove("hidden");
         navProfileGroup.classList.add("hidden");
-        userNameDisplay.innerText = "아무개";
+        userNameDisplay.innerText = "아무개님 환영합니다";
     }
 
     if (currentUser?.profilePic) {
-        updateProfileDisplay(currentUser.profilePic);
+        updateProfileDisplay(currentUser.profilePic, currentUser.profilePicCrop);
     } else {
         clearProfileDisplay();
     }
@@ -295,26 +507,90 @@ function loadSettings() {
     rainbowMode.checked = isRainbow;
     borderColorInput.value = savedColor;
     applyHeaderWallpaperInput.checked = applyHeaderWallpaper;
+    logoNeonHoverColorInput.value = logoNeonColor;
+    cursorStyleSelect.value = cursorStyle;
+    showShortcutsToggle.checked = showShortcuts;
     pendingBackgroundImage = null;
     pendingBackgroundReset = false;
     applyBorderEffect(isRainbow, savedColor);
     applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+    applyCursorStyle(cursorStyle);
+    applyLogoNeonColor(logoNeonColor);
+    renderWelcomeMessage(currentUser);
+    applyMainPageLayout(currentUser);
+    renderProfileImageLibrary(currentUser);
+    renderBackgroundImageLibrary(currentUser);
+    renderMainPresetPanel();
+    updateMainEditModeUI();
 }
 
-function updateProfileDisplay(picData) {
+function updateProfileDisplay(picData, cropData = null) {
     [headerProfileImg, profilePreview].forEach((img) => {
         img.src = picData;
         img.classList.remove("hidden");
+        applyProfileCropStyles(img, cropData);
     });
     [defaultAvatar, previewPlus].forEach((el) => el.classList.add("hidden"));
+}
+
+function addImageToHistory(list = [], imageData, limit = 12) {
+    if (!imageData) return Array.isArray(list) ? list : [];
+    const normalized = Array.isArray(list) ? list.filter(Boolean) : [];
+    const next = [imageData, ...normalized.filter((item) => item !== imageData)];
+    return next.slice(0, limit);
+}
+
+function renderProfileImageLibrary(user = getCurrentUser()) {
+    if (!profileImageLibrary) return;
+    const items = Array.isArray(user?.profileImageHistory) ? user.profileImageHistory : [];
+    profileImageLibrary.innerHTML = "";
+    items.forEach((src) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "image-history-item";
+        btn.innerHTML = `<img src="${src}" alt="프로필 후보">`;
+        btn.onclick = () => {
+            openProfileCropModal(src, pendingProfileCrop || user?.profilePicCrop || getDefaultProfileCrop());
+        };
+        profileImageLibrary.appendChild(btn);
+    });
+}
+
+function renderBackgroundImageLibrary(user = getCurrentUser()) {
+    if (!backgroundImageLibrary) return;
+    const items = Array.isArray(user?.backgroundImageHistory) ? user.backgroundImageHistory : [];
+    backgroundImageLibrary.innerHTML = "";
+    items.forEach((src) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "image-history-item";
+        btn.innerHTML = `<img src="${src}" alt="배경 후보">`;
+        btn.onclick = () => {
+            pendingBackgroundImage = src;
+            pendingBackgroundReset = false;
+            applySiteWallpaper(src, applyHeaderWallpaperInput.checked);
+        };
+        backgroundImageLibrary.appendChild(btn);
+    });
 }
 
 function clearProfileDisplay() {
     [headerProfileImg, profilePreview].forEach((img) => {
         img.src = "";
         img.classList.add("hidden");
+        applyProfileCropStyles(img, null);
     });
     [defaultAvatar, previewPlus].forEach((el) => el.classList.remove("hidden"));
+}
+
+function getDefaultProfileCrop() {
+    return { scale: 1, offsetX: 0, offsetY: 0 };
+}
+
+function applyProfileCropStyles(img, cropData) {
+    const crop = { ...getDefaultProfileCrop(), ...(cropData || {}) };
+    img.style.objectPosition = `${50 + crop.offsetX}% ${50 + crop.offsetY}%`;
+    img.style.transform = `scale(${crop.scale})`;
 }
 
 function applyBorderEffect(isRainbow, color) {
@@ -334,32 +610,638 @@ function applySiteWallpaper(imageData, applyToHeader) {
     const hasWallpaper = Boolean(imageData);
     document.body.classList.toggle("has-custom-wallpaper", hasWallpaper);
     document.body.style.backgroundImage = hasWallpaper ? `url(${imageData})` : "";
-    pageHeader.style.backgroundImage = hasWallpaper && applyToHeader ? `url(${imageData})` : "";
+    pageHeader.style.setProperty("background-color", "#ffffff", "important");
+    pageHeader.style.setProperty("background-image", imageData && applyToHeader
+        ? `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(${imageData})`
+        : "none", "important");
+    pageHeader.style.setProperty("background-position", "center", "important");
+    pageHeader.style.setProperty("background-size", "cover", "important");
+    pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+}
+
+function applyLogoNeonColor(color) {
+    document.documentElement.style.setProperty("--logo-neon-color", color);
+}
+
+function getMainPageLayoutForUser(user = getCurrentUser()) {
+    return {
+        ...getDefaultMainPageLayout(),
+        ...(user?.mainPageLayout || {}),
+        logo: {
+            ...getDefaultMainPageLayout().logo,
+            ...(user?.mainPageLayout?.logo || {})
+        },
+        welcome: {
+            ...getDefaultMainPageLayout().welcome,
+            ...(user?.mainPageLayout?.welcome || {})
+        },
+        shortcuts: {
+            ...getDefaultMainPageLayout().shortcuts,
+            ...(user?.mainPageLayout?.shortcuts || {})
+        },
+        customTexts: Array.isArray(user?.mainPageLayout?.customTexts) ? user.mainPageLayout.customTexts : [],
+        customImages: Array.isArray(user?.mainPageLayout?.customImages) ? user.mainPageLayout.customImages : []
+    };
+}
+
+function saveMainPageLayout(layout) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+    const users = getUsers();
+    const index = users.findIndex((user) => user.id === currentUser.id);
+    if (index === -1) return;
+    users[index].mainPageLayout = layout;
+    saveUsers(users);
+}
+
+function updateMainPageLayout(updater) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return null;
+    const layout = getMainPageLayoutForUser(currentUser);
+    const nextLayout = typeof updater === "function" ? updater(layout) : updater;
+    saveMainPageLayout(nextLayout);
+    return nextLayout;
+}
+
+function applyMainPageLayout(user = getCurrentUser()) {
+    const layout = getMainPageLayoutForUser(user);
+    const showShortcuts = user?.showShortcuts !== false;
+    mainLogoWrap.style.left = `${layout.logo.x}%`;
+    mainLogoWrap.style.top = `${layout.logo.y}%`;
+    mainLogoWrap.style.transform = "translate(-50%, -50%)";
+    mainCenterLogo.style.width = `${660 * (layout.logo.scale / 100)}px`;
+    mainLogoWrap.classList.toggle("hidden", Boolean(layout.logo.hidden));
+
+    welcomeText.style.left = `${layout.welcome.x}%`;
+    welcomeText.style.top = `${layout.welcome.y}%`;
+    welcomeText.style.transform = "translate(-50%, -50%)";
+    welcomeText.classList.toggle("hidden", Boolean(layout.welcome.hidden));
+
+    shortcutGrid.style.left = `${layout.shortcuts.x}%`;
+    shortcutGrid.style.top = `${layout.shortcuts.y}%`;
+    shortcutGrid.style.transform = `translate(-50%, -50%) scale(${layout.shortcuts.scale / 100})`;
+    shortcutGrid.classList.toggle("hidden", !showShortcuts);
+    renderCustomMainItems(layout);
+}
+
+function renderCustomMainItems(layout = getMainPageLayoutForUser()) {
+    if (!mainCustomLayer) return;
+    mainCustomLayer.innerHTML = "";
+
+    layout.customTexts.forEach((item) => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "main-custom-item";
+        wrapper.dataset.type = "custom-text";
+        wrapper.dataset.id = item.id;
+        wrapper.style.left = `${item.x}%`;
+        wrapper.style.top = `${item.y}%`;
+        wrapper.style.transform = "translate(-50%, -50%)";
+
+        const label = document.createElement("div");
+        label.className = "main-custom-text editable-welcome";
+        label.innerHTML = item.html || escapeHtml(item.text || "새 문구");
+        if (!item.html) {
+            const toolState = { ...getDefaultWelcomeToolState(), ...(item.toolState || {}) };
+            label.style.color = toolState.color;
+            label.style.fontSize = `${toolState.fontSize}px`;
+            label.style.fontFamily = toolState.fontFamily;
+            label.style.webkitTextStroke = `1px ${toolState.strokeColor}`;
+            label.style.textShadow = toolState.neon
+                ? `0 0 8px ${toolState.color}, 0 0 18px ${toolState.color}`
+                : "none";
+        }
+        label.tabIndex = 0;
+        label.setAttribute("role", "button");
+        label.addEventListener("click", (event) => {
+            if (!isMainEditMode) return;
+            if (Date.now() < suppressMainEditClickUntil) return;
+            event.stopPropagation();
+            startCustomTextEditing(label, item.id);
+        });
+        label.addEventListener("keydown", (event) => {
+            if (!isMainEditMode) return;
+            if (!activeCustomTextId) {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    startCustomTextEditing(label, item.id);
+                }
+                return;
+            }
+            handleCustomTextEditorKeydown(event);
+        });
+        label.addEventListener("beforeinput", handleCustomTextBeforeInput);
+        label.addEventListener("paste", handleCustomTextPaste);
+        label.addEventListener("compositionstart", handleCustomTextCompositionStart);
+        label.addEventListener("compositionend", handleCustomTextCompositionEnd);
+
+        wrapper.appendChild(label);
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "main-custom-delete";
+        deleteBtn.textContent = "×";
+        deleteBtn.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            deleteCustomMainItem("custom-text", item.id);
+        });
+        wrapper.appendChild(deleteBtn);
+        wrapper.addEventListener("pointerdown", (event) => handleMainItemPointerDown(event, "custom-text", item.id));
+        mainCustomLayer.appendChild(wrapper);
+    });
+
+    layout.customImages.forEach((item) => {
+        const wrapper = document.createElement("div");
+        wrapper.className = "main-custom-item";
+        wrapper.dataset.type = "custom-image";
+        wrapper.dataset.id = item.id;
+        wrapper.style.left = `${item.x}%`;
+        wrapper.style.top = `${item.y}%`;
+        wrapper.style.transform = "translate(-50%, -50%)";
+
+        const img = document.createElement("img");
+        img.className = "main-custom-image";
+        img.src = item.src;
+        img.alt = item.alt || "Custom";
+        img.style.width = `${item.width || 240}px`;
+
+        wrapper.appendChild(img);
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "main-custom-delete";
+        deleteBtn.textContent = "×";
+        deleteBtn.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            deleteCustomMainItem("custom-image", item.id);
+        });
+        wrapper.appendChild(deleteBtn);
+        wrapper.addEventListener("click", (event) => {
+            if (!isMainEditMode) return;
+            if (Date.now() < suppressMainEditClickUntil) return;
+            event.stopPropagation();
+            openSizeToolbarFor({ type: "custom-image", id: item.id }, event.clientX, event.clientY);
+        });
+        wrapper.addEventListener("pointerdown", (event) => handleMainItemPointerDown(event, "custom-image", item.id));
+        mainCustomLayer.appendChild(wrapper);
+    });
+}
+
+function persistLogoNeonColor(color) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+    const users = getUsers();
+    const index = users.findIndex((user) => user.id === currentUser.id);
+    if (index === -1) return;
+    users[index].logoNeonColor = color;
+    saveUsers(users);
+}
+
+function applyCursorStyle(cursorStyle) {
+    document.body.style.cursor = cursorStyle || "default";
+}
+
+function updateMainEditModeUI() {
+    document.body.classList.toggle("is-main-edit-mode", isMainEditMode);
+    mainEditStartBtn.classList.toggle("hidden", isMainEditMode);
+    mainEditSaveBtn.classList.toggle("hidden", !isMainEditMode);
+    mainEditCancelBtn.classList.toggle("hidden", !isMainEditMode);
+    mainEditResetBtn.classList.toggle("hidden", !isMainEditMode);
+    if (!isMainEditMode) {
+        shortcutModal.classList.add("hidden");
+        shortcutToolbar.classList.add("hidden");
+        welcomeToolbar.classList.add("hidden");
+        welcomeToolbarResetBtn.classList.add("hidden");
+        logoNeonHoverPanel.classList.add("hidden");
+        mainEditContextMenu.classList.add("hidden");
+        mainSizeToolbar.classList.add("hidden");
+    }
+}
+
+function cloneMainEditSnapshot() {
+    return {
+        userId: getCurrentUserId(),
+        users: JSON.parse(JSON.stringify(getUsers())),
+        shortcuts: JSON.parse(JSON.stringify(getShortcuts())),
+        presetPanelOpen: !mainPresetPanel.classList.contains("hidden")
+    };
+}
+
+function restoreMainEditSnapshot(snapshot) {
+    if (!snapshot) return;
+    saveUsers(snapshot.users);
+    localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(snapshot.shortcuts));
+    const user = snapshot.userId
+        ? snapshot.users.find((item) => item.id === snapshot.userId) || null
+        : null;
+    renderWelcomeMessage(user);
+    renderShortcuts();
+    applyLogoNeonColor(user?.logoNeonColor || "#62e7ff");
+    logoNeonHoverColorInput.value = user?.logoNeonColor || "#62e7ff";
+    applyMainPageLayout(user);
+    if (snapshot.presetPanelOpen) {
+        renderMainPresetPanel();
+        mainPresetPanel.classList.remove("hidden");
+    }
+}
+
+function enterMainEditMode() {
+    if (isMainEditMode) return;
+    mainEditSnapshot = cloneMainEditSnapshot();
+    isMainEditMode = true;
+    updateMainEditModeUI();
+    renderShortcuts();
+}
+
+function completeMainEditMode() {
+    if (!isMainEditMode) return;
+    if (isEditingWelcomeText) finishWelcomeTextEditing(true);
+    if (isEditingShortcutText) finishShortcutTextEditing(true);
+    mainEditSnapshot = null;
+    isMainEditMode = false;
+    updateMainEditModeUI();
+    renderShortcuts();
+}
+
+function cancelMainEditMode() {
+    if (!isMainEditMode) return;
+    if (isEditingWelcomeText) finishWelcomeTextEditing(false);
+    if (isEditingShortcutText) finishShortcutTextEditing(false);
+    if (activeCustomTextId) finishCustomTextEditing(false);
+    restoreMainEditSnapshot(mainEditSnapshot);
+    mainEditSnapshot = null;
+    isMainEditMode = false;
+    updateMainEditModeUI();
+}
+
+function resetMainEditToDefault() {
+    if (!isMainEditMode) return;
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+    const fallback = getDefaultWelcomeMessage(currentUser);
+    const defaultToolState = getDefaultWelcomeToolState();
+    updateMainPageLayout(getDefaultMainPageLayout());
+    const users = getUsers();
+    const index = users.findIndex((user) => user.id === currentUser.id);
+    if (index !== -1) {
+        users[index].welcomeMessage = fallback;
+        users[index].welcomeMessageHtml = escapeHtml(fallback);
+        users[index].welcomeToolState = { ...defaultToolState };
+        users[index].logoNeonColor = "#62e7ff";
+        saveUsers(users);
+    }
+    currentWelcomeToolState = defaultToolState;
+    applyWelcomeToolbarState();
+    applyLogoNeonColor("#62e7ff");
+    logoNeonHoverColorInput.value = "#62e7ff";
+    renderWelcomeMessage(getCurrentUser());
+    applyMainPageLayout(getCurrentUser());
+}
+
+function getMainPagePresets(user = getCurrentUser()) {
+    const presets = Array.isArray(user?.mainPagePresets) ? user.mainPagePresets : [];
+    return Array.from({ length: 3 }, (_, index) => presets[index] || null);
+}
+
+function renderMainPresetPanel() {
+    const presets = getMainPagePresets();
+    document.querySelectorAll(".main-preset-slot").forEach((slotEl, index) => {
+        const hasPreset = Boolean(presets[index]);
+        slotEl.querySelector("strong").textContent = hasPreset ? `프리셋 ${index + 1} 저장됨` : `프리셋 ${index + 1}`;
+        const applyBtn = slotEl.querySelector(".preset-apply-btn");
+        applyBtn.disabled = !hasPreset;
+        applyBtn.style.opacity = hasPreset ? "1" : "0.55";
+    });
+}
+
+function saveMainPresetSlot(index) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+        alert("로그인 후 프리셋을 저장할 수 있습니다.");
+        return;
+    }
+    if (isEditingWelcomeText) finishWelcomeTextEditing(true);
+    if (isEditingShortcutText) finishShortcutTextEditing(true);
+    if (activeCustomTextId) finishCustomTextEditing(true);
+    const users = getUsers();
+    const userIndex = users.findIndex((user) => user.id === currentUser.id);
+    if (userIndex === -1) return;
+    const presets = getMainPagePresets(currentUser);
+    presets[index] = {
+        layout: getMainPageLayoutForUser(currentUser),
+        shortcuts: JSON.parse(JSON.stringify(getShortcuts())),
+        welcomeMessage: currentUser.welcomeMessage || getDefaultWelcomeMessage(currentUser),
+        welcomeMessageHtml: currentUser.welcomeMessageHtml || escapeHtml(getDefaultWelcomeMessage(currentUser)),
+        welcomeToolState: { ...getStoredWelcomeToolState(currentUser) },
+        logoNeonColor: currentUser.logoNeonColor || "#62e7ff",
+        showShortcuts: currentUser.showShortcuts !== false
+    };
+    users[userIndex].mainPagePresets = presets;
+    saveUsers(users);
+    renderMainPresetPanel();
+}
+
+function applyMainPresetSlot(index) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+        alert("로그인 후 프리셋을 불러올 수 있습니다.");
+        return;
+    }
+    const presets = getMainPagePresets(currentUser);
+    const preset = presets[index];
+    if (!preset) return;
+    const users = getUsers();
+    const userIndex = users.findIndex((user) => user.id === currentUser.id);
+    if (userIndex === -1) return;
+    users[userIndex].mainPageLayout = preset.layout;
+    users[userIndex].welcomeMessage = preset.welcomeMessage;
+    users[userIndex].welcomeMessageHtml = preset.welcomeMessageHtml;
+    users[userIndex].welcomeToolState = preset.welcomeToolState;
+    users[userIndex].logoNeonColor = preset.logoNeonColor;
+    users[userIndex].showShortcuts = preset.showShortcuts;
+    saveUsers(users);
+    localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(preset.shortcuts || []));
+    loadSettings();
+    renderShortcuts();
+}
+
+function handleMainContentContextMenu(event) {
+    if (!isMainEditMode) return;
+    if (!getCurrentUser()) return;
+    event.preventDefault();
+    const rect = mainContent.getBoundingClientRect();
+    mainContextMenuPoint = {
+        x: clamp(((event.clientX - rect.left) / rect.width) * 100, 4, 96),
+        y: clamp(((event.clientY - rect.top) / rect.height) * 100, 8, 92)
+    };
+    mainEditContextMenu.style.left = `${event.clientX}px`;
+    mainEditContextMenu.style.top = `${event.clientY}px`;
+    mainEditContextMenu.classList.remove("hidden");
+}
+
+function addCustomTextAtContextPoint() {
+    if (!isMainEditMode || !getCurrentUser()) return;
+    mainEditContextMenu.classList.add("hidden");
+    const nextId = `text-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    updateMainPageLayout((layout) => ({
+        ...layout,
+        customTexts: [
+            ...layout.customTexts,
+            {
+                id: nextId,
+                x: mainContextMenuPoint.x,
+                y: mainContextMenuPoint.y,
+                text: "새 문구",
+                html: escapeHtml("새 문구"),
+                toolState: getDefaultWelcomeToolState()
+            }
+        ]
+    }));
+    applyMainPageLayout();
+    requestAnimationFrame(() => {
+        const label = mainCustomLayer.querySelector(`[data-id="${nextId}"] .main-custom-text`);
+        if (label) startCustomTextEditing(label, nextId);
+    });
+}
+
+function handleCustomImagePick(event) {
+    if (!isMainEditMode || !getCurrentUser()) return;
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > MAX_BACKGROUND_IMAGE_SIZE) {
+        alert("이미지 용량이 너무 큽니다. 12MB 이하 이미지를 사용해주세요.");
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+        const nextId = `image-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        updateMainPageLayout((layout) => ({
+            ...layout,
+            customImages: [
+                ...layout.customImages,
+                {
+                    id: nextId,
+                    x: mainContextMenuPoint.x,
+                    y: mainContextMenuPoint.y,
+                    width: 240,
+                    src: reader.result,
+                    alt: file.name
+                }
+            ]
+        }));
+        applyMainPageLayout();
+        openSizeToolbarFor({ type: "custom-image", id: nextId }, window.innerWidth / 2, window.innerHeight - 120);
+    };
+    reader.readAsDataURL(file);
+}
+
+function deleteCustomMainItem(type, id) {
+    if (!isMainEditMode) return;
+    if (type === "custom-text" && activeCustomTextId === id) {
+        activeCustomTextId = null;
+        welcomeToolbar.classList.add("hidden");
+        welcomeToolbarResetBtn.classList.add("hidden");
+    }
+    updateMainPageLayout((layout) => ({
+        ...layout,
+        customTexts: type === "custom-text" ? layout.customTexts.filter((item) => item.id !== id) : layout.customTexts,
+        customImages: type === "custom-image" ? layout.customImages.filter((item) => item.id !== id) : layout.customImages
+    }));
+    applyMainPageLayout();
+}
+
+function deleteBaseMainItem(type) {
+    if (!isMainEditMode) return;
+    if (type === "welcome" && isEditingWelcomeText) {
+        finishWelcomeTextEditing(false);
+    }
+    updateMainPageLayout((layout) => ({
+        ...layout,
+        logo: type === "logo" ? { ...layout.logo, hidden: true } : layout.logo,
+        welcome: type === "welcome" ? { ...layout.welcome, hidden: true } : layout.welcome
+    }));
+    applyMainPageLayout();
+}
+
+function handleMainItemPointerDown(event, type, id = null) {
+    if (!isMainEditMode) return;
+    if (event.target.closest("[contenteditable='true']")) return;
+    if (event.target.closest("#logo-neon-hover-panel")) return;
+    event.preventDefault();
+    const rect = mainContent.getBoundingClientRect();
+    mainDragState = {
+        type,
+        id,
+        rect,
+        pointerId: event.pointerId,
+        moved: false
+    };
+}
+
+function handleMainItemPointerMove(event) {
+    if (!mainDragState || mainDragState.pointerId !== event.pointerId) return;
+    mainDragState.moved = true;
+    const { rect, type, id } = mainDragState;
+    const x = clamp(((event.clientX - rect.left) / rect.width) * 100, 4, 96);
+    const y = clamp(((event.clientY - rect.top) / rect.height) * 100, 8, 92);
+    updateMainPageLayout((layout) => {
+        const next = {
+            ...layout,
+            logo: { ...layout.logo },
+            welcome: { ...layout.welcome },
+            shortcuts: { ...layout.shortcuts },
+            customTexts: [...layout.customTexts],
+            customImages: [...layout.customImages]
+        };
+        if (type === "logo") {
+            next.logo.x = x;
+            next.logo.y = y;
+        } else if (type === "welcome") {
+            next.welcome.x = x;
+            next.welcome.y = y;
+        } else if (type === "shortcuts") {
+            next.shortcuts.x = x;
+            next.shortcuts.y = y;
+        } else if (type === "custom-text") {
+            next.customTexts = next.customTexts.map((item) => item.id === id ? { ...item, x, y } : item);
+        } else if (type === "custom-image") {
+            next.customImages = next.customImages.map((item) => item.id === id ? { ...item, x, y } : item);
+        }
+        return next;
+    });
+    applyMainPageLayout();
+}
+
+function stopMainItemDragging() {
+    if (mainDragState?.moved) {
+        suppressMainEditClickUntil = Date.now() + 180;
+    }
+    mainDragState = null;
+}
+
+function openSizeToolbarFor(target, clientX, clientY) {
+    if (!isMainEditMode || !getCurrentUser()) return;
+    activeSizeTarget = target;
+    const layout = getMainPageLayoutForUser();
+    let label = "크기";
+    let value = 100;
+    let deletable = false;
+    if (target.type === "logo") {
+        label = "로고 크기";
+        value = layout.logo.scale || 100;
+    } else if (target.type === "shortcuts") {
+        label = "즐겨찾기 크기";
+        value = layout.shortcuts.scale || 100;
+    } else if (target.type === "custom-image") {
+        const item = layout.customImages.find((entry) => entry.id === target.id);
+        label = "이미지 크기";
+        value = Math.round(((item?.width || 240) / 240) * 100);
+        deletable = true;
+    }
+    mainSizeToolbarLabel.textContent = label;
+    mainSizeRange.value = String(clamp(value, 40, 220));
+    mainSizeDeleteBtn.classList.toggle("hidden", !deletable);
+    mainSizeToolbar.style.left = `${clientX}px`;
+    mainSizeToolbar.style.top = `${clientY + 18}px`;
+    mainSizeToolbar.classList.remove("hidden");
+}
+
+function handleMainSizeChange() {
+    if (!activeSizeTarget) return;
+    const nextValue = Number(mainSizeRange.value);
+    updateMainPageLayout((layout) => {
+        const next = {
+            ...layout,
+            logo: { ...layout.logo },
+            shortcuts: { ...layout.shortcuts },
+            customImages: [...layout.customImages]
+        };
+        if (activeSizeTarget.type === "logo") {
+            next.logo.scale = nextValue;
+        } else if (activeSizeTarget.type === "shortcuts") {
+            next.shortcuts.scale = nextValue;
+        } else if (activeSizeTarget.type === "custom-image") {
+            next.customImages = next.customImages.map((item) =>
+                item.id === activeSizeTarget.id ? { ...item, width: Math.round(240 * (nextValue / 100)) } : item
+            );
+        }
+        return next;
+    });
+    applyMainPageLayout();
+}
+
+function handleMainSizeDelete() {
+    if (!activeSizeTarget || activeSizeTarget.type !== "custom-image") return;
+    updateMainPageLayout((layout) => ({
+        ...layout,
+        customImages: layout.customImages.filter((item) => item.id !== activeSizeTarget.id)
+    }));
+    mainSizeToolbar.classList.add("hidden");
+    activeSizeTarget = null;
+    applyMainPageLayout();
+}
+
+function switchSettingsTab(tab) {
+    const isAccount = tab === "account";
+    settingsTabAccount.classList.toggle("is-active", isAccount);
+    settingsTabEnvironment.classList.toggle("is-active", !isAccount);
+    settingsPanelAccount.classList.toggle("hidden", !isAccount);
+    settingsPanelEnvironment.classList.toggle("hidden", isAccount);
+    settingsPanelAccount.classList.toggle("is-active", isAccount);
+    settingsPanelEnvironment.classList.toggle("is-active", !isAccount);
 }
 
 function handleProfileImageChange(e) {
     const file = e.target.files[0];
     if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+        alert("이미지 파일만 업로드할 수 있습니다.");
+        e.target.value = "";
+        return;
+    }
+
+    if (file.size > MAX_PROFILE_IMAGE_SIZE) {
+        alert("프로필 이미지는 8MB 이하로 업로드해주세요. 움직이는 이미지는 용량이 큰 경우가 많습니다.");
+        e.target.value = "";
+        return;
+    }
+
     if (file.size > 2 * 1024 * 1024) {
-        alert("이미지 용량이 큽니다. 2MB 이하를 권장합니다.");
+        alert("움직이는 이미지를 포함해 프로필 사진은 8MB 이하까지 사용할 수 있습니다. 현재 파일은 조금 큰 편입니다.");
     }
 
     const reader = new FileReader();
     reader.onload = (ev) => {
         const imageData = ev.target.result;
-        updateProfileDisplay(imageData);
-        pendingProfilePic = imageData;
+        const currentUser = getCurrentUser();
+        if (currentUser) {
+            const users = getUsers();
+            const index = users.findIndex((user) => user.id === currentUser.id);
+            if (index !== -1) {
+                users[index].profileImageHistory = addImageToHistory(users[index].profileImageHistory, imageData);
+                saveUsers(users);
+                renderProfileImageLibrary(users[index]);
+            }
+        }
+        openProfileCropModal(imageData, pendingProfileCrop || getCurrentUser()?.profilePicCrop || getDefaultProfileCrop());
     };
     reader.readAsDataURL(file);
+    e.target.value = "";
 }
 
 function handleBackgroundImageChange(event) {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+        alert("이미지 파일만 업로드할 수 있습니다.");
+        event.target.value = "";
+        return;
+    }
+
     if (file.size > MAX_BACKGROUND_IMAGE_SIZE) {
-        alert("배경화면 이미지는 4MB 이하로 업로드해주세요.");
+        alert("배경화면 이미지는 12MB 이하로 업로드해주세요. 움직이는 배경은 용량이 클 수 있습니다.");
         event.target.value = "";
         return;
     }
@@ -368,6 +1250,16 @@ function handleBackgroundImageChange(event) {
     reader.onload = (ev) => {
         pendingBackgroundImage = ev.target.result;
         pendingBackgroundReset = false;
+        const currentUser = getCurrentUser();
+        if (currentUser) {
+            const users = getUsers();
+            const index = users.findIndex((user) => user.id === currentUser.id);
+            if (index !== -1) {
+                users[index].backgroundImageHistory = addImageToHistory(users[index].backgroundImageHistory, pendingBackgroundImage);
+                saveUsers(users);
+                renderBackgroundImageLibrary(users[index]);
+            }
+        }
         applySiteWallpaper(pendingBackgroundImage, applyHeaderWallpaperInput.checked);
     };
     reader.readAsDataURL(file);
@@ -381,7 +1273,630 @@ function resetBackgroundImage() {
     applySiteWallpaper("", false);
 }
 
+function openProfileCropModal(imageData, initialCrop) {
+    profileCropDraft = {
+        imageData,
+        crop: { ...getDefaultProfileCrop(), ...(initialCrop || {}) }
+    };
+    profileCropImage.src = imageData;
+    profileCropZoom.value = String(profileCropDraft.crop.scale);
+    renderProfileCropStage();
+    profileCropModal.classList.remove("hidden");
+}
+
+function closeProfileCropModal() {
+    profileCropModal.classList.add("hidden");
+    profileCropDragState = null;
+    profileCropDraft = null;
+}
+
+function renderProfileCropStage() {
+    if (!profileCropDraft) return;
+    applyProfileCropStyles(profileCropImage, profileCropDraft.crop);
+}
+
+function commitProfileCropSelection() {
+    if (!profileCropDraft) return;
+    pendingProfilePic = profileCropDraft.imageData;
+    pendingProfileCrop = { ...profileCropDraft.crop };
+    updateProfileDisplay(profileCropDraft.imageData, pendingProfileCrop);
+    closeProfileCropModal();
+}
+
+function handleProfileCropPointerDown(event) {
+    if (!profileCropDraft) return;
+    profileCropDragState = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: profileCropDraft.crop.offsetX,
+        originY: profileCropDraft.crop.offsetY
+    };
+    profileCropStage.setPointerCapture(event.pointerId);
+}
+
+function handleProfileCropPointerMove(event) {
+    if (!profileCropDragState || profileCropDragState.pointerId !== event.pointerId || !profileCropDraft) return;
+    const dx = event.clientX - profileCropDragState.startX;
+    const dy = event.clientY - profileCropDragState.startY;
+    const width = profileCropStage.clientWidth || 1;
+    const height = profileCropStage.clientHeight || 1;
+    profileCropDraft.crop.offsetX = clamp(profileCropDragState.originX + (dx / width) * 100, -80, 80);
+    profileCropDraft.crop.offsetY = clamp(profileCropDragState.originY + (dy / height) * 100, -80, 80);
+    renderProfileCropStage();
+}
+
+function stopProfileCropDragging() {
+    profileCropDragState = null;
+}
+
+function getDefaultWelcomeMessage(user) {
+    return user ? `${user.id}님 환영합니다` : "아무개님 환영합니다";
+}
+
+function getDefaultWelcomeToolState() {
+    return {
+        color: "#111111",
+        fontSize: 40,
+        strokeColor: "#111111",
+        fontFamily: "'Noto Sans KR', sans-serif",
+        neon: false
+    };
+}
+
+function getDefaultShortcutToolState() {
+    return {
+        color: "#333333",
+        fontSize: 13,
+        strokeColor: "#333333",
+        fontFamily: "'Noto Sans KR', sans-serif",
+        neon: false
+    };
+}
+
+function getDefaultMainPageLayout() {
+    return {
+        logo: { x: 50, y: 24, scale: 100, hidden: false },
+        welcome: { x: 50, y: 56, hidden: false },
+        shortcuts: { x: 50, y: 74, scale: 100 },
+        customTexts: [],
+        customImages: []
+    };
+}
+
+function getStoredWelcomeToolState(user) {
+    return {
+        ...getDefaultWelcomeToolState(),
+        ...(user?.welcomeToolState || {})
+    };
+}
+
+function renderWelcomeMessage(user) {
+    const fallback = getDefaultWelcomeMessage(user);
+    userNameDisplay.innerHTML = user?.welcomeMessageHtml || escapeHtml(user?.welcomeMessage || fallback);
+}
+
+function applyWelcomeToolbarState() {
+    welcomeTextColorInput.value = currentWelcomeToolState.color;
+    welcomeFontSizeInput.value = String(currentWelcomeToolState.fontSize);
+    welcomeStrokeColorInput.value = currentWelcomeToolState.strokeColor;
+    welcomeFontFamilySelect.value = currentWelcomeToolState.fontFamily;
+    welcomeNeonToggle.checked = currentWelcomeToolState.neon;
+}
+
+function applyShortcutToolbarState() {
+    shortcutTextColorInput.value = currentShortcutToolState.color;
+    shortcutFontSizeInput.value = String(currentShortcutToolState.fontSize);
+    shortcutStrokeColorInput.value = currentShortcutToolState.strokeColor;
+    shortcutFontFamilySelect.value = currentShortcutToolState.fontFamily;
+    shortcutNeonToggle.checked = currentShortcutToolState.neon;
+}
+
+function buildStyledSpan(text, toolState) {
+    const span = document.createElement("span");
+    span.textContent = text.replaceAll(" ", "\u00A0");
+    span.style.color = toolState.color;
+    span.style.fontSize = `${toolState.fontSize}px`;
+    span.style.fontFamily = toolState.fontFamily;
+    span.style.webkitTextStroke = `1px ${toolState.strokeColor}`;
+    span.style.textShadow = toolState.neon
+        ? `0 0 8px ${toolState.color}, 0 0 18px ${toolState.color}`
+        : "none";
+    span.style.whiteSpace = "pre";
+    return span;
+}
+
+function buildWelcomeStyledSpan(text) {
+    return buildStyledSpan(text, currentWelcomeToolState);
+}
+
+function buildShortcutStyledSpan(text) {
+    return buildStyledSpan(text, currentShortcutToolState);
+}
+
+function insertNodeAtCurrentSelection(node) {
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+    range.insertNode(node);
+    range.setStartAfter(node);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
+function placeCaretAtEnd(element) {
+    const range = document.createRange();
+    const selection = window.getSelection();
+    range.selectNodeContents(element);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
+function positionWelcomeToolbarDefault() {
+    if (!welcomeToolbar.offsetWidth) {
+        requestAnimationFrame(positionWelcomeToolbarDefault);
+        return;
+    }
+    const left = Math.max(24, (window.innerWidth - welcomeToolbar.offsetWidth) / 2);
+    const top = Math.max(120, window.innerHeight - welcomeToolbar.offsetHeight - 28);
+    welcomeToolbar.style.left = `${left + welcomeToolbar.offsetWidth / 2}px`;
+    welcomeToolbar.style.top = `${top + welcomeToolbar.offsetHeight / 2}px`;
+    welcomeToolbar.style.transform = "translate(-50%, -50%)";
+}
+
+function resetWelcomeToolbarPosition() {
+    positionWelcomeToolbarDefault();
+}
+
+function positionShortcutToolbarDefault() {
+    shortcutToolbar.style.left = "50%";
+    shortcutToolbar.style.bottom = "28px";
+    shortcutToolbar.style.transform = "translateX(-50%)";
+}
+
+function startWelcomeTextEditing() {
+    if (isEditingWelcomeText) return;
+    if (!isMainEditMode) return;
+    if (isEditingShortcutText) finishShortcutTextEditing(true);
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+        alert("로그인한 상태에서만 환영 문구를 수정할 수 있습니다.");
+        return;
+    }
+
+    isEditingWelcomeText = true;
+    userNameDisplay.classList.add("is-editing");
+    userNameDisplay.setAttribute("contenteditable", "true");
+    userNameDisplay.setAttribute("role", "textbox");
+    if (!userNameDisplay.innerHTML.trim()) {
+        userNameDisplay.innerHTML = escapeHtml(getDefaultWelcomeMessage(currentUser));
+    }
+
+    currentWelcomeToolState = getStoredWelcomeToolState(currentUser);
+    applyWelcomeToolbarState();
+    welcomeToolbar.classList.remove("hidden");
+    welcomeToolbarResetBtn.classList.remove("hidden");
+    if (!welcomeToolbarDefaultsApplied) {
+        positionWelcomeToolbarDefault();
+        welcomeToolbarDefaultsApplied = true;
+    }
+    placeCaretAtEnd(userNameDisplay);
+    userNameDisplay.focus();
+}
+
+function finishWelcomeTextEditing(shouldSave) {
+    if (!isEditingWelcomeText) return;
+    const currentUser = getCurrentUser();
+    const fallback = getDefaultWelcomeMessage(currentUser);
+    const nextText = userNameDisplay.textContent.trim() || fallback;
+
+    if (shouldSave) {
+        if (!userNameDisplay.textContent.trim()) {
+            userNameDisplay.textContent = fallback;
+        }
+        saveWelcomeMessage(nextText, userNameDisplay.innerHTML);
+    } else {
+        renderWelcomeMessage(currentUser);
+    }
+
+    userNameDisplay.removeAttribute("contenteditable");
+    userNameDisplay.setAttribute("role", "button");
+    userNameDisplay.classList.remove("is-editing");
+    welcomeToolbar.classList.add("hidden");
+    welcomeToolbarResetBtn.classList.add("hidden");
+    welcomeCompositionStart = null;
+    isEditingWelcomeText = false;
+}
+
+function handleWelcomeEditorOutsideClick(event) {
+    if (!isEditingWelcomeText) return;
+    if (welcomeText.contains(event.target)) return;
+    if (welcomeToolbar.contains(event.target)) return;
+    if (welcomeToolbarResetBtn.contains(event.target)) return;
+    finishWelcomeTextEditing(true);
+}
+
+function handleCustomTextOutsideClick(event) {
+    if (!activeCustomTextId) return;
+    const targetLabel = mainCustomLayer.querySelector(`[data-id="${activeCustomTextId}"] .main-custom-text`);
+    if (targetLabel?.contains(event.target)) return;
+    if (welcomeToolbar.contains(event.target)) return;
+    if (welcomeToolbarResetBtn.contains(event.target)) return;
+    finishCustomTextEditing(true);
+}
+
+function startCustomTextEditing(labelEl, textId) {
+    if (!isMainEditMode) return;
+    if (isEditingWelcomeText) finishWelcomeTextEditing(true);
+    if (isEditingShortcutText) finishShortcutTextEditing(true);
+    if (activeCustomTextId === textId) return;
+    if (activeCustomTextId) finishCustomTextEditing(true);
+
+    const item = getMainPageLayoutForUser().customTexts.find((entry) => entry.id === textId);
+    if (!item) return;
+    activeCustomTextId = textId;
+    currentWelcomeToolState = {
+        ...getDefaultWelcomeToolState(),
+        ...(item.toolState || {})
+    };
+    applyWelcomeToolbarState();
+    labelEl.classList.add("is-editing");
+    labelEl.setAttribute("contenteditable", "true");
+    labelEl.setAttribute("role", "textbox");
+    welcomeToolbar.classList.remove("hidden");
+    welcomeToolbarResetBtn.classList.remove("hidden");
+    if (!welcomeToolbarDefaultsApplied) {
+        positionWelcomeToolbarDefault();
+        welcomeToolbarDefaultsApplied = true;
+    }
+    placeCaretAtEnd(labelEl);
+    labelEl.focus();
+}
+
+function finishCustomTextEditing(shouldSave) {
+    if (!activeCustomTextId) return;
+    const labelEl = mainCustomLayer.querySelector(`[data-id="${activeCustomTextId}"] .main-custom-text`);
+    const fallback = "새 문구";
+    if (labelEl && shouldSave) {
+        const text = labelEl.textContent.trim() || fallback;
+        updateMainPageLayout((layout) => ({
+            ...layout,
+            customTexts: layout.customTexts.map((item) =>
+                item.id === activeCustomTextId
+                    ? { ...item, text, html: labelEl.innerHTML, toolState: { ...currentWelcomeToolState } }
+                    : item
+            )
+        }));
+    }
+    if (labelEl) {
+        labelEl.removeAttribute("contenteditable");
+        labelEl.setAttribute("role", "button");
+        labelEl.classList.remove("is-editing");
+    }
+    activeCustomTextId = null;
+    customTextCompositionStart = null;
+    welcomeToolbar.classList.add("hidden");
+    welcomeToolbarResetBtn.classList.add("hidden");
+    applyMainPageLayout();
+}
+
+function handleCustomTextEditorKeydown(event) {
+    if (!activeCustomTextId) return;
+    if (event.isComposing) return;
+    if (event.key === "Enter") {
+        event.preventDefault();
+        finishCustomTextEditing(true);
+    } else if (event.key === "Escape") {
+        event.preventDefault();
+        finishCustomTextEditing(false);
+    }
+}
+
+function handleCustomTextBeforeInput(event) {
+    if (!activeCustomTextId) return;
+    if (event.isComposing || event.inputType.includes("Composition")) return;
+    if (event.inputType === "insertParagraph") {
+        event.preventDefault();
+        finishCustomTextEditing(true);
+        return;
+    }
+    if (!event.inputType.startsWith("insert") || !event.data) return;
+    event.preventDefault();
+    insertNodeAtCurrentSelection(buildWelcomeStyledSpan(event.data));
+}
+
+function handleCustomTextPaste(event) {
+    if (!activeCustomTextId) return;
+    event.preventDefault();
+    const text = event.clipboardData?.getData("text/plain") || "";
+    if (!text) return;
+    insertNodeAtCurrentSelection(buildWelcomeStyledSpan(text));
+}
+
+function handleCustomTextCompositionStart() {
+    if (!activeCustomTextId) return;
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return;
+    const range = selection.getRangeAt(0).cloneRange();
+    customTextCompositionStart = {
+        startContainer: range.startContainer,
+        startOffset: range.startOffset
+    };
+}
+
+function handleCustomTextCompositionEnd() {
+    if (!activeCustomTextId || !customTextCompositionStart) return;
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) {
+        customTextCompositionStart = null;
+        return;
+    }
+    try {
+        const endRange = selection.getRangeAt(0).cloneRange();
+        const range = document.createRange();
+        range.setStart(customTextCompositionStart.startContainer, customTextCompositionStart.startOffset);
+        range.setEnd(endRange.endContainer, endRange.endOffset);
+        const composedText = range.toString();
+        if (composedText) {
+            range.deleteContents();
+            const styledSpan = buildWelcomeStyledSpan(composedText);
+            range.insertNode(styledSpan);
+            placeCaretAfterNode(styledSpan);
+        }
+    } catch (error) {
+        console.warn("Custom text composition styling skipped", error);
+    }
+    customTextCompositionStart = null;
+}
+
+function handleWelcomeEditorKeydown(event) {
+    if (!isEditingWelcomeText) return;
+    if (event.isComposing) return;
+    if (event.key === "Enter") {
+        event.preventDefault();
+        finishWelcomeTextEditing(true);
+    } else if (event.key === "Escape") {
+        event.preventDefault();
+        finishWelcomeTextEditing(false);
+    }
+}
+
+function handleWelcomeBeforeInput(event) {
+    if (!isEditingWelcomeText) return;
+    if (event.isComposing || event.inputType.includes("Composition")) return;
+    if (event.inputType === "insertParagraph") {
+        event.preventDefault();
+        finishWelcomeTextEditing(true);
+        return;
+    }
+    if (!event.inputType.startsWith("insert") || !event.data) return;
+    event.preventDefault();
+    insertNodeAtCurrentSelection(buildWelcomeStyledSpan(event.data));
+}
+
+function handleWelcomePaste(event) {
+    if (!isEditingWelcomeText) return;
+    event.preventDefault();
+    const text = event.clipboardData?.getData("text/plain") || "";
+    if (!text) return;
+    insertNodeAtCurrentSelection(buildWelcomeStyledSpan(text));
+}
+
+function handleWelcomeCompositionStart() {
+    if (!isEditingWelcomeText) return;
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return;
+    const range = selection.getRangeAt(0).cloneRange();
+    welcomeCompositionStart = {
+        startContainer: range.startContainer,
+        startOffset: range.startOffset
+    };
+}
+
+function handleWelcomeCompositionEnd() {
+    if (!isEditingWelcomeText || !welcomeCompositionStart) return;
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) {
+        welcomeCompositionStart = null;
+        return;
+    }
+
+    try {
+        const endRange = selection.getRangeAt(0).cloneRange();
+        const range = document.createRange();
+        range.setStart(welcomeCompositionStart.startContainer, welcomeCompositionStart.startOffset);
+        range.setEnd(endRange.endContainer, endRange.endOffset);
+        const composedText = range.toString();
+        if (composedText) {
+            range.deleteContents();
+            const styledSpan = buildWelcomeStyledSpan(composedText);
+            range.insertNode(styledSpan);
+            placeCaretAfterNode(styledSpan);
+        }
+    } catch (error) {
+        console.warn("Welcome composition styling skipped", error);
+    }
+
+    welcomeCompositionStart = null;
+}
+
+function placeCaretAfterNode(node) {
+    const range = document.createRange();
+    const selection = window.getSelection();
+    range.setStartAfter(node);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
+function saveWelcomeMessage(message, html) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+    const users = getUsers();
+    const index = users.findIndex((user) => user.id === currentUser.id);
+    if (index === -1) return;
+    users[index].welcomeMessage = message;
+    users[index].welcomeMessageHtml = html;
+    users[index].welcomeToolState = { ...currentWelcomeToolState };
+    saveUsers(users);
+}
+
+function getStoredShortcutToolState(item) {
+    return {
+        ...getDefaultShortcutToolState(),
+        ...(item?.labelToolState || {})
+    };
+}
+
+function normalizeShortcutItem(item, index) {
+    return {
+        id: item?.id || `shortcut-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+        name: item?.name || "즐겨찾기",
+        url: item?.url || "",
+        labelHtml: typeof item?.labelHtml === "string" ? item.labelHtml : "",
+        labelToolState: {
+            ...getDefaultShortcutToolState(),
+            ...(item?.labelToolState || {})
+        }
+    };
+}
+
+function startShortcutTextEditing(labelEl, shortcutId) {
+    if (!isMainEditMode) return;
+    if (isEditingShortcutText && currentShortcutEditingId === shortcutId) return;
+    if (isEditingWelcomeText) finishWelcomeTextEditing(true);
+    if (isEditingShortcutText) finishShortcutTextEditing(true);
+
+    const shortcut = getShortcuts().find((item) => item.id === shortcutId);
+    if (!shortcut) return;
+
+    isEditingShortcutText = true;
+    currentShortcutEditingId = shortcutId;
+    activeShortcutTextEl = labelEl;
+    currentShortcutToolState = getStoredShortcutToolState(shortcut);
+
+    activeShortcutTextEl.classList.add("is-editing");
+    activeShortcutTextEl.setAttribute("contenteditable", "true");
+    activeShortcutTextEl.setAttribute("role", "textbox");
+    applyShortcutToolbarState();
+    shortcutToolbar.classList.remove("hidden");
+    positionShortcutToolbarDefault();
+    placeCaretAtEnd(activeShortcutTextEl);
+    activeShortcutTextEl.focus();
+}
+
+function finishShortcutTextEditing(shouldSave) {
+    if (!isEditingShortcutText || !activeShortcutTextEl) return;
+
+    const shortcutId = currentShortcutEditingId;
+    const shortcuts = getShortcuts();
+    const shortcut = shortcuts.find((item) => item.id === shortcutId);
+    const fallback = shortcut?.name || "즐겨찾기";
+    const nextText = activeShortcutTextEl.textContent.trim() || fallback;
+
+    if (shouldSave && shortcut) {
+        shortcut.name = nextText;
+        shortcut.labelHtml = activeShortcutTextEl.innerHTML;
+        shortcut.labelToolState = { ...currentShortcutToolState };
+        localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(shortcuts));
+    }
+
+    activeShortcutTextEl.removeAttribute("contenteditable");
+    activeShortcutTextEl.setAttribute("role", "button");
+    activeShortcutTextEl.classList.remove("is-editing");
+    shortcutToolbar.classList.add("hidden");
+    shortcutCompositionStart = null;
+    isEditingShortcutText = false;
+    activeShortcutTextEl = null;
+    currentShortcutEditingId = null;
+    renderShortcuts();
+}
+
+function handleShortcutEditorOutsideClick(event) {
+    if (!isEditingShortcutText || !activeShortcutTextEl) return;
+    if (activeShortcutTextEl.contains(event.target)) return;
+    if (shortcutToolbar.contains(event.target)) return;
+    finishShortcutTextEditing(true);
+}
+
+function handleShortcutEditorKeydown(event) {
+    if (!isEditingShortcutText || event.target !== activeShortcutTextEl) return;
+    if (event.isComposing) return;
+    if (event.key === "Enter") {
+        event.preventDefault();
+        finishShortcutTextEditing(true);
+    } else if (event.key === "Escape") {
+        event.preventDefault();
+        finishShortcutTextEditing(false);
+    }
+}
+
+function handleShortcutBeforeInput(event) {
+    if (!isEditingShortcutText || event.target !== activeShortcutTextEl) return;
+    if (event.isComposing || event.inputType.includes("Composition")) return;
+    if (event.inputType === "insertParagraph") {
+        event.preventDefault();
+        finishShortcutTextEditing(true);
+        return;
+    }
+    if (!event.inputType.startsWith("insert") || !event.data) return;
+    event.preventDefault();
+    insertNodeAtCurrentSelection(buildShortcutStyledSpan(event.data));
+}
+
+function handleShortcutPaste(event) {
+    if (!isEditingShortcutText || event.target !== activeShortcutTextEl) return;
+    event.preventDefault();
+    const text = event.clipboardData?.getData("text/plain") || "";
+    if (!text) return;
+    insertNodeAtCurrentSelection(buildShortcutStyledSpan(text));
+}
+
+function handleShortcutCompositionStart(event) {
+    if (!isEditingShortcutText || event.target !== activeShortcutTextEl) return;
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) return;
+    const range = selection.getRangeAt(0).cloneRange();
+    shortcutCompositionStart = {
+        startContainer: range.startContainer,
+        startOffset: range.startOffset
+    };
+}
+
+function handleShortcutCompositionEnd(event) {
+    if (!isEditingShortcutText || event.target !== activeShortcutTextEl || !shortcutCompositionStart) return;
+    const selection = window.getSelection();
+    if (!selection || !selection.rangeCount) {
+        shortcutCompositionStart = null;
+        return;
+    }
+
+    try {
+        const endRange = selection.getRangeAt(0).cloneRange();
+        const range = document.createRange();
+        range.setStart(shortcutCompositionStart.startContainer, shortcutCompositionStart.startOffset);
+        range.setEnd(endRange.endContainer, endRange.endOffset);
+        const composedText = range.toString();
+        if (composedText) {
+            range.deleteContents();
+            const styledSpan = buildShortcutStyledSpan(composedText);
+            range.insertNode(styledSpan);
+            placeCaretAfterNode(styledSpan);
+        }
+    } catch (error) {
+        console.warn("Shortcut composition styling skipped", error);
+    }
+
+    shortcutCompositionStart = null;
+}
+
 function showPage(pageId) {
+    if (pageId !== "main-page" && isMainEditMode) {
+        cancelMainEditMode();
+    }
     ["main-page", "profile-page", "music-page", "video-page"].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.classList.add("hidden");
@@ -416,10 +1931,21 @@ function handleSignup() {
         id,
         pw,
         profilePic: "",
+        profilePicCrop: getDefaultProfileCrop(),
         borderColor: "#000000",
         rainbowMode: false,
         backgroundImage: "",
-        applyHeaderWallpaper: false
+        applyHeaderWallpaper: false,
+        logoNeonColor: "#62e7ff",
+        cursorStyle: "default",
+        showShortcuts: true,
+        profileImageHistory: [],
+        backgroundImageHistory: [],
+        mainPagePresets: [null, null, null],
+        welcomeMessage: `${id}님 환영합니다`,
+        welcomeMessageHtml: escapeHtml(`${id}님 환영합니다`),
+        welcomeToolState: getDefaultWelcomeToolState(),
+        mainPageLayout: getDefaultMainPageLayout()
     });
     saveUsers(users);
     localStorage.setItem(CURRENT_USER_KEY, id);
@@ -458,12 +1984,19 @@ function handleLogout() {
 }
 
 function saveShortcut() {
+    if (!isMainEditMode) return;
     const name = shortcutNameInput.value.trim();
     const url = shortcutUrlInput.value.trim();
     if (!name || !url) return alert("이름과 URL을 모두 입력해주세요!");
 
     const shortcuts = getShortcuts();
-    shortcuts.push({ name, url });
+    shortcuts.push({
+        id: `shortcut-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name,
+        url,
+        labelHtml: "",
+        labelToolState: getDefaultShortcutToolState()
+    });
     localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(shortcuts));
     shortcutNameInput.value = "";
     shortcutUrlInput.value = "";
@@ -473,7 +2006,26 @@ function saveShortcut() {
 
 function getShortcuts() {
     const parsed = JSON.parse(localStorage.getItem(SHORTCUTS_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    let needsSave = false;
+    const normalized = parsed.map((item, index) => {
+        const nextItem = normalizeShortcutItem(item, index);
+        if (
+            nextItem.id !== item?.id ||
+            nextItem.labelHtml !== (item?.labelHtml || "") ||
+            JSON.stringify(nextItem.labelToolState) !== JSON.stringify({
+                ...getDefaultShortcutToolState(),
+                ...(item?.labelToolState || {})
+            })
+        ) {
+            needsSave = true;
+        }
+        return nextItem;
+    });
+    if (needsSave) {
+        localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(normalized));
+    }
+    return normalized;
 }
 
 function renderShortcuts() {
@@ -488,13 +2040,61 @@ function renderShortcuts() {
         const a = document.createElement("a");
         a.href = item.url.startsWith("http") ? item.url : `https://${item.url}`;
         a.target = "_blank";
-        a.style.cssText = "text-decoration:none; color:#333; display:flex; flex-direction:column; align-items:center; gap:8px;";
+        a.className = "shortcut-link";
+        a.addEventListener("click", (event) => {
+            if (isMainEditMode || (isEditingShortcutText && currentShortcutEditingId === item.id)) {
+                event.preventDefault();
+            }
+        });
 
         const iconUrl = `https://www.google.com/s2/favicons?sz=128&domain=${item.url}`;
-        a.innerHTML = `
-            <img src="${iconUrl}" style="width:55px; height:55px; object-fit:contain;" alt="${item.name}">
-            <span class="shortcut-text" style="font-size:13px; margin-top:8px;">${item.name}</span>
-        `;
+        const icon = document.createElement("img");
+        icon.src = iconUrl;
+        icon.alt = item.name;
+        icon.style.width = "55px";
+        icon.style.height = "55px";
+        icon.style.objectFit = "contain";
+
+        const label = document.createElement("span");
+        label.className = "shortcut-text editable-shortcut-text";
+        label.tabIndex = 0;
+        label.setAttribute("role", "button");
+        label.setAttribute("aria-label", "즐겨찾기 텍스트 수정");
+        label.innerHTML = item.labelHtml || escapeHtml(item.name);
+        if (!item.labelHtml) {
+            const defaultState = getStoredShortcutToolState(item);
+            label.style.color = defaultState.color;
+            label.style.fontSize = `${defaultState.fontSize}px`;
+            label.style.fontFamily = defaultState.fontFamily;
+            label.style.webkitTextStroke = `1px ${defaultState.strokeColor}`;
+            label.style.textShadow = defaultState.neon
+                ? `0 0 8px ${defaultState.color}, 0 0 18px ${defaultState.color}`
+                : "none";
+        }
+
+        label.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            startShortcutTextEditing(label, item.id);
+        });
+        label.addEventListener("keydown", (event) => {
+            if (!isEditingShortcutText) {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    startShortcutTextEditing(label, item.id);
+                }
+                return;
+            }
+            handleShortcutEditorKeydown(event);
+        });
+        label.addEventListener("beforeinput", handleShortcutBeforeInput);
+        label.addEventListener("paste", handleShortcutPaste);
+        label.addEventListener("compositionstart", handleShortcutCompositionStart);
+        label.addEventListener("compositionend", handleShortcutCompositionEnd);
+
+        a.appendChild(icon);
+        a.appendChild(label);
 
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
@@ -510,13 +2110,20 @@ function renderShortcuts() {
         deleteBtn.onclick = (e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (!isMainEditMode) return;
             const shortcuts = getShortcuts();
             shortcuts.splice(index, 1);
             localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(shortcuts));
+            if (isEditingShortcutText && currentShortcutEditingId === item.id) {
+                shortcutToolbar.classList.add("hidden");
+                isEditingShortcutText = false;
+                activeShortcutTextEl = null;
+                currentShortcutEditingId = null;
+            }
             renderShortcuts();
         };
 
-        wrapper.addEventListener("mouseenter", () => { deleteBtn.style.display = "flex"; });
+        wrapper.addEventListener("mouseenter", () => { deleteBtn.style.display = isMainEditMode ? "flex" : "none"; });
         wrapper.addEventListener("mouseleave", () => { deleteBtn.style.display = "none"; });
 
         wrapper.appendChild(a);
@@ -548,8 +2155,12 @@ async function saveProfileSettings() {
         if (newId) users[currentIndex].id = newId;
         if (newPw) users[currentIndex].pw = newPw;
         if (pendingProfilePic) users[currentIndex].profilePic = pendingProfilePic;
+        if (pendingProfileCrop) users[currentIndex].profilePicCrop = { ...pendingProfileCrop };
         users[currentIndex].rainbowMode = rainbowMode.checked;
         users[currentIndex].borderColor = borderColorInput.value;
+        users[currentIndex].logoNeonColor = logoNeonHoverColorInput.value;
+        users[currentIndex].cursorStyle = cursorStyleSelect.value;
+        users[currentIndex].showShortcuts = showShortcutsToggle.checked;
         if (pendingBackgroundReset) {
             users[currentIndex].backgroundImage = "";
         } else if (pendingBackgroundImage !== null) {
@@ -698,10 +2309,21 @@ function migrateLegacyUserData() {
         id: legacyId,
         pw: legacyPw,
         profilePic: localStorage.getItem("userProfilePic") || "",
+        profilePicCrop: getDefaultProfileCrop(),
         borderColor: localStorage.getItem("profileBorderColor") || "#000000",
         rainbowMode: localStorage.getItem("rainbowMode") === "true",
         backgroundImage: "",
-        applyHeaderWallpaper: false
+        applyHeaderWallpaper: false,
+        logoNeonColor: "#62e7ff",
+        cursorStyle: "default",
+        showShortcuts: true,
+        profileImageHistory: [],
+        backgroundImageHistory: [],
+        mainPagePresets: [null, null, null],
+        welcomeMessage: `${legacyId}님 환영합니다`,
+        welcomeMessageHtml: escapeHtml(`${legacyId}님 환영합니다`),
+        welcomeToolState: getDefaultWelcomeToolState(),
+        mainPageLayout: getDefaultMainPageLayout()
     };
 
     saveUsers([migratedUser]);
@@ -2534,4 +4156,8 @@ function escapeHtml(value) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
+}
+
+function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
 }

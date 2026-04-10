@@ -681,6 +681,10 @@ body.has-custom-wallpaper #music-page::before {
     opacity: 0.18;
 }
 
+body.has-custom-wallpaper #music-page.has-track-background::before {
+    opacity: var(--music-track-bg-opacity);
+}
+
 .profile-right { flex: 1.5; display: flex; flex-direction: column; gap: 25px; }
 .input-group { display: flex; flex-direction: column; gap: 10px; }
 .input-group label { font-weight: bold; color: #555; }
@@ -747,6 +751,7 @@ body.has-custom-wallpaper #music-page::before {
     --music-progress-fill-opacity: 1;
     --music-progress-border-opacity: 0.8;
     --music-progress-neon-opacity: 0.24;
+    --music-record-border: 116,214,255;
     --music-record-neon: 116,214,255;
     --music-record-opacity: 1;
     --music-record-border-opacity: 0.04;
@@ -1126,19 +1131,20 @@ body.has-custom-wallpaper #music-page::before {
 }
 
 .mini-video-header {
-    height: 52px;
+    height: 38px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 14px;
-    background: rgba(17,17,17,0.96);
-    color: white;
-    font-size: 0.9rem;
+    padding: 0 12px;
+    background: rgba(255,255,255,0.96);
+    color: #222;
+    border-bottom: 1px solid rgba(17,17,17,0.08);
+    font-size: 0.84rem;
     font-weight: 800;
 }
 
 .mini-video-body {
-    height: calc(100% - 52px);
+    height: calc(100% - 38px);
     background: #0b1015;
 }
 
@@ -1159,7 +1165,6 @@ body.has-custom-wallpaper #music-page::before {
 }
 
 #music-page.has-track-background::before {
-    opacity: var(--music-track-bg-opacity);
     background-image: var(--music-track-bg-url);
     background-size: cover;
     background-position: center;
@@ -1244,7 +1249,7 @@ body.has-custom-wallpaper #music-page::before {
     background: transparent;
     opacity: var(--music-record-opacity);
     box-shadow:
-        0 0 0 2px rgba(0,0,0,var(--music-record-border-opacity)),
+        0 0 0 2px rgba(var(--music-record-border), var(--music-record-border-opacity)),
         0 0 24px rgba(var(--music-record-neon), var(--music-record-neon-opacity)),
         0 28px 60px rgba(0,0,0,0.10);
     position: relative;
@@ -1301,9 +1306,9 @@ body.has-custom-wallpaper #music-page::before {
 .record-disc:hover,
 .record-disc:focus-visible {
     box-shadow:
-        0 0 0 2px rgba(114,214,255,0.72),
-        0 0 22px rgba(114,214,255,0.62),
-        0 0 42px rgba(114,214,255,0.32),
+        0 0 0 2px rgba(var(--music-record-border), 0.72),
+        0 0 22px rgba(var(--music-record-neon), 0.62),
+        0 0 42px rgba(var(--music-record-neon), 0.32),
         0 28px 60px rgba(0,0,0,0.22),
         inset 0 0 0 1px rgba(255,255,255,0.08);
     transform: scale(1.01);
@@ -1312,9 +1317,9 @@ body.has-custom-wallpaper #music-page::before {
 
 .record-disc.is-playing {
     box-shadow:
-        0 0 0 2px rgba(118,220,255,0.82),
-        0 0 26px rgba(118,220,255,0.72),
-        0 0 56px rgba(118,220,255,0.32),
+        0 0 0 2px rgba(var(--music-record-border), 0.82),
+        0 0 26px rgba(var(--music-record-neon), 0.72),
+        0 0 56px rgba(var(--music-record-neon), 0.32),
         0 30px 70px rgba(0,0,0,0.22),
         inset 0 0 0 1px rgba(255,255,255,0.08);
     animation: record-spin 4.8s linear infinite;

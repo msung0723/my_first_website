@@ -2413,7 +2413,14 @@ async function saveProfileSettings() {
         }
 
         alert("설정이 저장되었습니다!");
-        location.reload();
+        pendingProfilePic = null;
+        pendingProfileCrop = null;
+        pendingBackgroundImage = null;
+        pendingBackgroundReset = false;
+        loadSettings();
+        renderShortcuts();
+        renderMusicUI();
+        renderVideoUI();
     } catch (error) {
         alert("저장 공간이 부족하거나 오류가 발생했습니다. 사진 크기를 줄여보세요.");
     }
@@ -4742,6 +4749,12 @@ function getScopedVideoLibraryKey() {
 }
 
 function initVideoPage() {
+    if (videoViewer?.parentElement !== document.body) {
+        document.body.appendChild(videoViewer);
+    }
+    if (miniVideoPlayer?.parentElement !== document.body) {
+        document.body.appendChild(miniVideoPlayer);
+    }
     bindVideoEvents();
     loadVideoState();
     renderVideoUI();
@@ -4962,9 +4975,7 @@ function syncVideoViewer() {
     const currentVideo = getCurrentVideo();
     if (!currentVideo) {
         videoViewer.classList.add("hidden");
-        if (!videoState.isMiniPlayer) {
-            miniVideoPlayer.classList.add("hidden");
-        }
+        miniVideoPlayer.classList.add("hidden");
         return;
     }
 
@@ -4979,6 +4990,7 @@ function syncVideoViewer() {
         videoViewer.classList.add("hidden");
     } else {
         attachVideoPlayer(videoPlayerMainHost, true);
+        miniVideoPlayer.classList.add("hidden");
         videoViewer.classList.remove("hidden");
     }
 }

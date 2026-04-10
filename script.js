@@ -38,6 +38,8 @@ const mainCustomImageInput = document.getElementById("main-custom-image-input");
 const mainSizeToolbar = document.getElementById("main-size-toolbar");
 const mainSizeToolbarLabel = document.getElementById("main-size-toolbar-label");
 const mainSizeRange = document.getElementById("main-size-range");
+const mainSizeNeonColor = document.getElementById("main-size-neon-color");
+const mainSizeNeonIntensity = document.getElementById("main-size-neon-intensity");
 const mainSizeDeleteBtn = document.getElementById("main-size-delete-btn");
 const mainLogoDeleteBtn = document.getElementById("main-logo-delete-btn");
 const welcomeDeleteBtn = document.getElementById("welcome-delete-btn");
@@ -103,7 +105,9 @@ const transportToggleIcon = document.getElementById("transport-toggle-icon");
 const playbackCurrentTime = document.getElementById("playback-current-time");
 const playbackDuration = document.getElementById("playback-duration");
 const playbackProgress = document.getElementById("playback-progress");
-const playbackVolume = document.getElementById("playback-volume");
+const playbackVolume = document.getElementById("header-playback-volume");
+const navVolumeBtn = document.getElementById("nav-volume-btn");
+const headerVolumePanel = document.getElementById("header-volume-panel");
 const repeatToggleBtn = document.getElementById("repeat-toggle");
 const autoplayToggleBtn = document.getElementById("autoplay-toggle");
 const musicStyleEditBtn = document.getElementById("music-style-edit-btn");
@@ -358,6 +362,10 @@ function bindCoreEvents() {
             : (getCurrentUser()?.backgroundImage || "");
         applySiteWallpaper(wallpaper, applyHeaderWallpaperInput.checked);
     };
+    navVolumeBtn.onclick = (event) => {
+        event.stopPropagation();
+        headerVolumePanel.classList.toggle("hidden");
+    };
     mainLogoWrap.addEventListener("click", (event) => {
         if (!isMainEditMode) return;
         event.stopPropagation();
@@ -475,6 +483,8 @@ function bindCoreEvents() {
     };
     mainCustomImageInput.onchange = handleCustomImagePick;
     mainSizeRange.oninput = handleMainSizeChange;
+    if (mainSizeNeonColor) mainSizeNeonColor.oninput = handleMainImageNeonChange;
+    if (mainSizeNeonIntensity) mainSizeNeonIntensity.oninput = handleMainImageNeonChange;
     mainSizeDeleteBtn.onclick = handleMainSizeDelete;
     mainLogoWrap.addEventListener("pointerdown", (event) => handleMainItemPointerDown(event, "logo"));
     welcomeText.addEventListener("pointerdown", (event) => handleMainItemPointerDown(event, "welcome"));
@@ -512,6 +522,9 @@ function bindCoreEvents() {
     document.getElementById("logo-main").onclick = () => showPage("main-page");
 
     window.onclick = (e) => {
+        if (!headerVolumePanel.classList.contains("hidden") && !headerVolumePanel.contains(e.target) && !navVolumeBtn.contains(e.target)) {
+            headerVolumePanel.classList.add("hidden");
+        }
         if (!logoNeonHoverPanel.classList.contains("hidden") && !mainLogoWrap.contains(e.target)) {
             logoNeonHoverPanel.classList.add("hidden");
         }
@@ -538,7 +551,7 @@ function loadSettings() {
     const isRainbow = Boolean(currentUser?.rainbowMode);
     const wallpaperImage = currentUser?.backgroundImage || "";
     const applyHeaderWallpaper = Boolean(currentUser?.applyHeaderWallpaper);
-    const logoNeonColor = currentUser?.logoNeonColor || "#62e7ff";
+    const logoNeonColor = currentUser?.logoNeonColor || "";
     const cursorStyle = currentUser?.cursorStyle || "default";
     const showShortcuts = currentUser?.showShortcuts !== false;
     const welcomeMessage = currentUser?.welcomeMessage || (currentUser ? `${currentUser.id}님 환영합니다` : "아무개님 환영합니다");
@@ -564,7 +577,7 @@ function loadSettings() {
     rainbowMode.checked = isRainbow;
     borderColorInput.value = savedColor;
     applyHeaderWallpaperInput.checked = applyHeaderWallpaper;
-    logoNeonHoverColorInput.value = logoNeonColor;
+    logoNeonHoverColorInput.value = logoNeonColor || "#62e7ff";
     cursorStyleSelect.value = cursorStyle;
     showShortcutsToggle.checked = showShortcuts;
     pendingBackgroundImage = null;
@@ -677,7 +690,7 @@ function applySiteWallpaper(imageData, applyToHeader) {
 }
 
 function applyLogoNeonColor(color) {
-    document.documentElement.style.setProperty("--logo-neon-color", color);
+    document.documentElement.style.setProperty("--logo-neon-color", color || "rgba(98, 231, 255, 0)");
 }
 
 function getMainPageLayoutForUser(user = getCurrentUser()) {
@@ -820,6 +833,8 @@ function renderCustomMainItems(layout = getMainPageLayoutForUser()) {
         img.src = item.src;
         img.alt = item.alt || "Custom";
         img.style.width = `${item.width || 240}px`;
+        img.style.setProperty("--image-neon-color", item.neonColor || "#62e7ff");
+        img.style.setProperty("--image-neon-alpha", String(item.neonIntensity ?? 0.55));
 
         wrapper.appendChild(img);
         const deleteBtn = document.createElement("button");
@@ -893,7 +908,7 @@ function restoreMainEditSnapshot(snapshot) {
         : null;
     renderWelcomeMessage(user);
     renderShortcuts();
-    applyLogoNeonColor(user?.logoNeonColor || "#62e7ff");
+    applyLogoNeonColor(user?.logoNeonColor || "");
     logoNeonHoverColorInput.value = user?.logoNeonColor || "#62e7ff";
     applyMainPageLayout(user);
     if (snapshot.presetPanelOpen) {
@@ -944,12 +959,12 @@ function resetMainEditToDefault() {
         users[index].welcomeMessage = fallback;
         users[index].welcomeMessageHtml = escapeHtml(fallback);
         users[index].welcomeToolState = { ...defaultToolState };
-        users[index].logoNeonColor = "#62e7ff";
+        users[index].logoNeonColor = "";
         saveUsers(users);
     }
     currentWelcomeToolState = defaultToolState;
     applyWelcomeToolbarState();
-    applyLogoNeonColor("#62e7ff");
+    applyLogoNeonColor("");
     logoNeonHoverColorInput.value = "#62e7ff";
     renderWelcomeMessage(getCurrentUser());
     applyMainPageLayout(getCurrentUser());
@@ -1082,6 +1097,8 @@ function handleCustomImagePick(event) {
                     x: mainContextMenuPoint.x,
                     y: mainContextMenuPoint.y,
                     width: 240,
+                    neonColor: "#62e7ff",
+                    neonIntensity: 0.55,
                     src: reader.result,
                     alt: file.name
                 }
@@ -1187,14 +1204,20 @@ function openSizeToolbarFor(target, clientX, clientY) {
     if (target.type === "logo") {
         label = "로고 크기";
         value = layout.logo.scale || 100;
+        if (mainSizeNeonColor) mainSizeNeonColor.value = getCurrentUser()?.logoNeonColor || "#62e7ff";
+        if (mainSizeNeonIntensity) mainSizeNeonIntensity.value = "70";
     } else if (target.type === "shortcuts") {
         label = "즐겨찾기 크기";
         value = layout.shortcuts.scale || 100;
+        if (mainSizeNeonColor) mainSizeNeonColor.value = "#62e7ff";
+        if (mainSizeNeonIntensity) mainSizeNeonIntensity.value = "0";
     } else if (target.type === "custom-image") {
         const item = layout.customImages.find((entry) => entry.id === target.id);
         label = "이미지 크기";
         value = Math.round(((item?.width || 240) / 240) * 100);
         deletable = true;
+        if (mainSizeNeonColor) mainSizeNeonColor.value = item?.neonColor || "#62e7ff";
+        if (mainSizeNeonIntensity) mainSizeNeonIntensity.value = String(Math.round((item?.neonIntensity ?? 0.55) * 100));
     }
     mainSizeToolbarLabel.textContent = label;
     mainSizeRange.value = String(clamp(value, 40, 220));
@@ -1225,6 +1248,27 @@ function handleMainSizeChange() {
         }
         return next;
     });
+    applyMainPageLayout();
+}
+
+function handleMainImageNeonChange() {
+    if (!activeSizeTarget || !mainSizeNeonColor || !mainSizeNeonIntensity) return;
+    const neonColor = mainSizeNeonColor.value;
+    const neonIntensity = Number(mainSizeNeonIntensity.value) / 100;
+
+    if (activeSizeTarget.type === "logo") {
+        logoNeonHoverColorInput.value = neonColor;
+        applyLogoNeonColor(neonColor);
+        return;
+    }
+
+    if (activeSizeTarget.type !== "custom-image") return;
+    updateMainPageLayout((layout) => ({
+        ...layout,
+        customImages: layout.customImages.map((item) =>
+            item.id === activeSizeTarget.id ? { ...item, neonColor, neonIntensity } : item
+        )
+    }));
     applyMainPageLayout();
 }
 
@@ -2113,7 +2157,7 @@ function handleSignup() {
         rainbowMode: false,
         backgroundImage: "",
         applyHeaderWallpaper: false,
-        logoNeonColor: "#62e7ff",
+        logoNeonColor: "",
         cursorStyle: "default",
         showShortcuts: true,
         profileImageHistory: [],
@@ -3652,7 +3696,6 @@ function applyMusicTrackBackdrop() {
     if (!backgroundArt) {
         musicPage.classList.remove("has-track-background");
         musicPage.style.setProperty("--music-track-bg-url", "none");
-        musicPage.style.setProperty("--music-track-bg-overlay", "0");
         return;
     }
 
@@ -3661,7 +3704,6 @@ function applyMusicTrackBackdrop() {
     void musicPage.offsetWidth;
     musicPage.classList.add("track-backdrop-refresh");
     musicPage.style.setProperty("--music-track-bg-url", `url("${backgroundArt}")`);
-    musicPage.style.setProperty("--music-track-bg-overlay", musicState.playingTrackId === activeTrack.id ? "1" : "0.72");
 }
 
 function handlePlaybackScrub() {
@@ -4058,6 +4100,7 @@ function syncMusicThemeInputs() {
 function openMusicStyleEditor() {
     isMusicStyleEditMode = true;
     musicStylePanel.classList.remove("hidden");
+    musicStyleEditBtn.classList.add("hidden");
     musicStyleCloseBtn.classList.remove("hidden");
     syncMusicThemeInputs();
 }
@@ -4065,6 +4108,7 @@ function openMusicStyleEditor() {
 function closeMusicStyleEditor() {
     isMusicStyleEditMode = false;
     musicStylePanel.classList.add("hidden");
+    musicStyleEditBtn.classList.remove("hidden");
     musicStyleCloseBtn.classList.add("hidden");
 }
 

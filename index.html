@@ -16,6 +16,12 @@
         </div>
 
         <div class="nav-menu">
+            <div class="header-volume-control">
+                <button id="nav-volume-btn" class="icon-btn" type="button" aria-label="음량 조절"><i class="fa-solid fa-volume-high"></i></button>
+                <div id="header-volume-panel" class="header-volume-panel hidden">
+                    <input id="header-playback-volume" class="header-volume-slider" type="range" min="0" max="100" value="100" step="1" aria-label="음량">
+                </div>
+            </div>
             <button id="nav-signup-btn" class="nav-btn" type="button">회원가입</button>
             <button id="nav-login-btn" class="nav-btn hidden" type="button">로그인</button>
             <div id="nav-profile-group" class="hidden">
@@ -216,6 +222,14 @@
     <div id="main-size-toolbar" class="main-size-toolbar hidden">
         <span id="main-size-toolbar-label">크기</span>
         <input id="main-size-range" type="range" min="40" max="220" step="1" value="100">
+        <label class="main-size-color-field">
+            <span>네온</span>
+            <input id="main-size-neon-color" type="color" value="#62e7ff">
+        </label>
+        <label class="main-size-color-field">
+            <span>강도</span>
+            <input id="main-size-neon-intensity" type="range" min="0" max="100" step="1" value="55">
+        </label>
         <button id="main-size-delete-btn" class="nav-btn gray hidden" type="button">삭제</button>
     </div>
 

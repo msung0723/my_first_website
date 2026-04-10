@@ -103,6 +103,7 @@ const transportToggleIcon = document.getElementById("transport-toggle-icon");
 const playbackCurrentTime = document.getElementById("playback-current-time");
 const playbackDuration = document.getElementById("playback-duration");
 const playbackProgress = document.getElementById("playback-progress");
+const playbackVolume = document.getElementById("playback-volume");
 const repeatToggleBtn = document.getElementById("repeat-toggle");
 const autoplayToggleBtn = document.getElementById("autoplay-toggle");
 const musicStyleEditBtn = document.getElementById("music-style-edit-btn");
@@ -193,6 +194,7 @@ const recordEffectModal = document.getElementById("record-effect-modal");
 const closeRecordEffectModalBtn = document.getElementById("close-record-effect-modal");
 const recordEffectGrid = document.getElementById("record-effect-grid");
 const trackArtInput = document.getElementById("track-art-input");
+const trackBackgroundInput = document.getElementById("track-background-input");
 const videoAddModal = document.getElementById("video-add-modal");
 const closeVideoAddBtn = document.getElementById("close-video-add");
 const videoAddFab = document.getElementById("video-add-fab");
@@ -254,6 +256,7 @@ let youtubePlayerReadyPromise = null;
 let playbackMonitorInterval = null;
 let isScrubbingPlayback = false;
 let pendingTrackArtTargetId = null;
+let pendingTrackBackgroundTargetId = null;
 let playlistAnimationTimer = null;
 let activeDragState = null;
 let guestVideos = [];
@@ -287,6 +290,7 @@ const RECORD_EFFECT_OPTIONS = [
     { id: "prism" }
 ];
 const MAX_TRACK_ART_SIZE = 1024 * 1024 * 1.5;
+const MAX_TRACK_BACKGROUND_SIZE = 1024 * 1024 * 4;
 const MAX_PROFILE_IMAGE_SIZE = 1024 * 1024 * 8;
 const MAX_BACKGROUND_IMAGE_SIZE = 1024 * 1024 * 12;
 
@@ -300,7 +304,8 @@ let musicState = {
     globalRecordStyle: "classic",
     recordEffect: "none",
     repeatEnabled: false,
-    autoplayEnabled: false
+    autoplayEnabled: false,
+    volume: 1
 };
 let videoState = {
     library: [],
@@ -860,6 +865,7 @@ function updateMainEditModeUI() {
     mainEditResetBtn.classList.toggle("hidden", !isMainEditMode);
     if (!isMainEditMode) {
         shortcutModal.classList.add("hidden");
+        mainPresetPanel.classList.add("hidden");
         shortcutToolbar.classList.add("hidden");
         welcomeToolbar.classList.add("hidden");
         welcomeToolbarResetBtn.classList.add("hidden");
@@ -1492,6 +1498,16 @@ function hexToRgbTriplet(hex) {
     const g = parseInt(value.slice(2, 4), 16);
     const b = parseInt(value.slice(4, 6), 16);
     return `${r}, ${g}, ${b}`;
+}
+
+function normalizeTrackData(track = {}) {
+    return {
+        recordStyle: "classic",
+        customRecordArt: "",
+        customBackgroundArt: "",
+        rotateRecord: true,
+        ...track
+    };
 }
 
 function getMusicThemeDisplayOpacity(section) {
@@ -2368,6 +2384,7 @@ function bindMusicEvents() {
     musicStyleCloseBtn.onclick = () => closeMusicStyleEditor();
     playbackProgress.addEventListener("input", handlePlaybackScrub);
     playbackProgress.addEventListener("change", applyPlaybackScrub);
+    playbackVolume?.addEventListener("input", handlePlaybackVolumeChange);
     [
         musicBarBgColorInput,
         musicBarBorderColorInput,
@@ -2430,6 +2447,7 @@ function bindMusicEvents() {
     openRecordEffectModalBtn.onclick = () => openRecordEffectModal();
     closeRecordEffectModalBtn.onclick = () => recordEffectModal.classList.add("hidden");
     trackArtInput.onchange = handleTrackArtUpload;
+    trackBackgroundInput.onchange = handleTrackBackgroundUpload;
 
     playlistEditorSelect.onchange = () => {
         musicState.currentPlaylistId = playlistEditorSelect.value;
@@ -2472,11 +2490,7 @@ async function loadMusicState() {
     const savedState = stateKey ? JSON.parse(localStorage.getItem(stateKey) || "{}") : {};
 
     musicState.library = Array.isArray(savedLibrary)
-        ? savedLibrary.map((track) => ({
-            recordStyle: "classic",
-            customRecordArt: "",
-            ...track
-        }))
+        ? savedLibrary.map((track) => normalizeTrackData(track))
         : [];
     musicState.playlists = Array.isArray(savedState.playlists) ? savedState.playlists : [];
     musicState.currentPlaylistId = savedState.currentPlaylistId || null;
@@ -2496,6 +2510,7 @@ async function loadMusicState() {
     musicState.recordEffect = savedState.recordEffect || (savedState.rainbowReflectionEnabled ? "rainbow-a" : "none");
     musicState.repeatEnabled = Boolean(savedState.repeatEnabled);
     musicState.autoplayEnabled = Boolean(savedState.autoplayEnabled);
+    musicState.volume = Number.isFinite(savedState.volume) ? Math.min(1, Math.max(0, savedState.volume)) : 1;
     if (!musicState.playlists.length) {
         const defaultPlaylist = createPlaylistObject(DEFAULT_PLAYLIST_NAME);
         musicState.playlists = [defaultPlaylist];
@@ -2505,6 +2520,9 @@ async function loadMusicState() {
     if (!musicState.currentPlaylistId || !getCurrentPlaylist()) {
         musicState.currentPlaylistId = musicState.playlists[0].id;
     }
+
+    musicAudio.volume = musicState.volume;
+    if (playbackVolume) playbackVolume.value = String(Math.round(musicState.volume * 100));
 
     normalizeSelectedTrack();
     saveMusicState();
@@ -2651,7 +2669,8 @@ function saveMusicState() {
             globalRecordStyle: musicState.globalRecordStyle,
             recordEffect: musicState.recordEffect,
             repeatEnabled: musicState.repeatEnabled,
-            autoplayEnabled: musicState.autoplayEnabled
+            autoplayEnabled: musicState.autoplayEnabled,
+            volume: musicState.volume
         }));
         return true;
     } catch (error) {
@@ -2692,15 +2711,13 @@ async function saveMusicTrack() {
         }
 
         const trackId = createId("track");
-        musicState.library.push({
+        musicState.library.push(normalizeTrackData({
             id: trackId,
             name: customTitle || "유튜브 음악",
             sourceType: "youtube",
-            recordStyle: "classic",
-            customRecordArt: "",
             youtubeId,
             youtubeUrl
-        });
+        }));
         playlist.trackIds.push(trackId);
     } else {
         const file = musicFileInput.files[0];
@@ -2711,14 +2728,12 @@ async function saveMusicTrack() {
 
         const trackId = createId("track");
         await saveTrackBlob(trackId, file);
-        musicState.library.push({
+        musicState.library.push(normalizeTrackData({
             id: trackId,
             name: customTitle || file.name.replace(/\.[^.]+$/, "") || file.name,
             originalName: file.name,
-            sourceType: "file",
-            recordStyle: "classic",
-            customRecordArt: ""
-        });
+            sourceType: "file"
+        }));
         playlist.trackIds.push(trackId);
     }
 
@@ -2870,6 +2885,7 @@ async function playSelectedTrack() {
 
     activeAudioUrl = URL.createObjectURL(blob);
     musicAudio.src = activeAudioUrl;
+    musicAudio.volume = musicState.volume;
     musicState.playingTrackId = selectedTrack.id;
     saveMusicState();
 
@@ -3364,6 +3380,24 @@ async function getTrackBlob(trackId) {
     return null;
 }
 
+async function deleteTrackBlob(trackId) {
+    if (!isLoggedInUser()) {
+        guestTrackBlobs.delete(trackId);
+        return;
+    }
+
+    const db = await openMusicDb();
+    const storageKeys = getLegacyTrackStorageKeys(trackId);
+
+    await new Promise((resolve, reject) => {
+        const transaction = db.transaction(MUSIC_STORE_NAME, "readwrite");
+        const store = transaction.objectStore(MUSIC_STORE_NAME);
+        storageKeys.forEach((storageKey) => store.delete(storageKey));
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+    });
+}
+
 async function handleRecordInteraction() {
     const selectedTrack = getTrackById(musicState.selectedTrackId);
     if (!selectedTrack) {
@@ -3472,7 +3506,7 @@ async function playYoutubeTrack(track) {
     youtubePlayerHost.classList.remove("hidden");
     player.loadVideoById(track.youtubeId);
     if (typeof player.unMute === "function") player.unMute();
-    if (typeof player.setVolume === "function") player.setVolume(100);
+    if (typeof player.setVolume === "function") player.setVolume(Math.round(musicState.volume * 100));
     if (typeof player.playVideo === "function") player.playVideo();
     syncPlaybackUi();
 }
@@ -3520,14 +3554,17 @@ function updatePlaybackControls() {
     const hasTrack = Boolean(musicState.playingTrackId);
     const hasSelectedTrack = Boolean(musicState.selectedTrackId);
     const isPlaying = isPlaybackActive();
+    const playingTrack = getTrackById(musicState.playingTrackId);
 
     transportToggleBtn.disabled = !hasTrack && !hasSelectedTrack;
     transportToggleIcon.className = `fa-solid ${isPlaying ? "fa-pause" : "fa-play"}`;
+    recordDisc.classList.toggle("no-rotation", Boolean(playingTrack && playingTrack.rotateRecord === false));
 
     repeatToggleBtn.classList.toggle("is-active", musicState.repeatEnabled);
     repeatToggleBtn.setAttribute("aria-pressed", String(musicState.repeatEnabled));
     autoplayToggleBtn.classList.toggle("is-active", musicState.autoplayEnabled);
     autoplayToggleBtn.setAttribute("aria-pressed", String(musicState.autoplayEnabled));
+    if (playbackVolume) playbackVolume.value = String(Math.round((musicState.volume ?? 1) * 100));
 }
 
 function syncPlaybackUi() {
@@ -3537,6 +3574,7 @@ function syncPlaybackUi() {
     updatePlaybackTexts();
     updatePlaybackControls();
     updatePlaybackProgressUi();
+    applyMusicTrackBackdrop();
 }
 
 function startPlaybackMonitor() {
@@ -3592,6 +3630,38 @@ function updatePlaybackProgressUi() {
     playbackDuration.textContent = formatTime(duration);
     playbackProgress.disabled = !musicState.playingTrackId || duration <= 0;
     playbackProgress.value = duration > 0 ? (currentTime / duration) * 100 : 0;
+}
+
+function handlePlaybackVolumeChange() {
+    const nextVolume = Math.min(1, Math.max(0, Number(playbackVolume?.value || 100) / 100));
+    musicState.volume = nextVolume;
+    musicAudio.volume = nextVolume;
+    if (youtubePlayer && typeof youtubePlayer.setVolume === "function") {
+        youtubePlayer.setVolume(Math.round(nextVolume * 100));
+    }
+    saveMusicState();
+}
+
+function applyMusicTrackBackdrop() {
+    const musicPage = document.getElementById("music-page");
+    if (!musicPage) return;
+
+    const activeTrack = getTrackById(musicState.playingTrackId) || getTrackById(musicState.selectedTrackId);
+    const backgroundArt = activeTrack?.customBackgroundArt || "";
+
+    if (!backgroundArt) {
+        musicPage.classList.remove("has-track-background");
+        musicPage.style.setProperty("--music-track-bg-url", "none");
+        musicPage.style.setProperty("--music-track-bg-overlay", "0");
+        return;
+    }
+
+    musicPage.classList.add("has-track-background");
+    musicPage.classList.remove("track-backdrop-refresh");
+    void musicPage.offsetWidth;
+    musicPage.classList.add("track-backdrop-refresh");
+    musicPage.style.setProperty("--music-track-bg-url", `url("${backgroundArt}")`);
+    musicPage.style.setProperty("--music-track-bg-overlay", musicState.playingTrackId === activeTrack.id ? "1" : "0.72");
 }
 
 function handlePlaybackScrub() {
@@ -3709,6 +3779,7 @@ function renderMusicUI() {
     applyRecordAppearance();
     updateRecordStyleButton();
     applyMusicThemeToPage();
+    applyMusicTrackBackdrop();
 }
 
 function renderPlaylist() {
@@ -4270,6 +4341,157 @@ function handleTrackArtUpload(event) {
         }
     };
     reader.readAsDataURL(file);
+}
+
+function requestTrackBackgroundUpload(trackId) {
+    pendingTrackBackgroundTargetId = trackId;
+    trackBackgroundInput.value = "";
+    trackBackgroundInput.click();
+}
+
+function handleTrackBackgroundUpload(event) {
+    const file = event.target.files?.[0];
+    const targetTrack = getTrackById(pendingTrackBackgroundTargetId);
+    if (!file || !targetTrack) return;
+    if (file.size > MAX_TRACK_BACKGROUND_SIZE) {
+        alert("배경 이미지는 4MB 이하만 업로드할 수 있습니다.");
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+        const previousArt = targetTrack.customBackgroundArt || "";
+        targetTrack.customBackgroundArt = String(reader.result || "");
+
+        if (!saveMusicState()) {
+            targetTrack.customBackgroundArt = previousArt;
+            alert("배경 이미지 저장에 실패했습니다. 파일 크기를 줄이거나 브라우저 저장 공간을 확인해주세요.");
+            return;
+        }
+
+        renderMusicUI();
+        renderLibraryPickerIfVisible();
+    };
+    reader.readAsDataURL(file);
+}
+
+function toggleTrackRotation(trackId) {
+    const track = getTrackById(trackId);
+    if (!track) return;
+    track.rotateRecord = track.rotateRecord === false ? true : false;
+    saveMusicState();
+    renderMusicUI();
+    renderLibraryPickerIfVisible();
+}
+
+async function deleteTrackFromLibrary(trackId) {
+    const track = getTrackById(trackId);
+    if (!track) return;
+
+    const confirmed = confirm(`'${track.name}' 곡을 보관함에서 영구적으로 삭제할까요?`);
+    if (!confirmed) return;
+
+    if (musicState.playingTrackId === trackId) {
+        stopYoutubePlayback();
+        musicAudio.pause();
+        musicAudio.removeAttribute("src");
+        if (activeAudioUrl) {
+            URL.revokeObjectURL(activeAudioUrl);
+            activeAudioUrl = null;
+        }
+        musicState.playingTrackId = null;
+    }
+
+    if (musicState.selectedTrackId === trackId) {
+        musicState.selectedTrackId = null;
+    }
+
+    musicState.library = musicState.library.filter((item) => item.id !== trackId);
+    musicState.playlists = musicState.playlists.map((playlist) => ({
+        ...playlist,
+        trackIds: playlist.trackIds.filter((id) => id !== trackId)
+    }));
+
+    normalizeSelectedTrack();
+
+    try {
+        await deleteTrackBlob(trackId);
+    } catch (error) {
+        console.error("Failed to delete track blob", error);
+    }
+
+    saveMusicState();
+    renderMusicUI();
+    openPlaylistEditorIfVisible();
+    renderLibraryPickerIfVisible();
+}
+
+function renderLibraryPicker() {
+    const playlist = getCurrentPlaylist();
+    libraryPickerList.innerHTML = "";
+
+    if (!musicState.library.length) {
+        const empty = document.createElement("div");
+        empty.className = "playlist-edit-subtitle";
+        empty.textContent = "보관함에 추가된 노래가 아직 없습니다.";
+        libraryPickerList.appendChild(empty);
+        return;
+    }
+
+    musicState.library.forEach((track) => {
+        const row = document.createElement("div");
+        row.className = "library-picker-item";
+
+        const meta = document.createElement("div");
+        meta.className = "playlist-edit-meta";
+        meta.innerHTML = `
+            <div class="playlist-edit-title">${track.name}</div>
+            <div class="library-picker-type">${track.sourceType === "youtube" ? "유튜브 링크" : "mp3 파일"}</div>
+        `;
+
+        const actions = document.createElement("div");
+        actions.className = "library-picker-actions";
+
+        const rotateBtn = document.createElement("button");
+        rotateBtn.type = "button";
+        rotateBtn.className = "mini-btn";
+        rotateBtn.title = "음반 회전 켜기 또는 끄기";
+        rotateBtn.innerHTML = `<i class="fa-solid ${track.rotateRecord === false ? "fa-circle-stop" : "fa-rotate"}"></i>`;
+        rotateBtn.onclick = () => toggleTrackRotation(track.id);
+
+        const artBtn = document.createElement("button");
+        artBtn.type = "button";
+        artBtn.className = "mini-btn";
+        artBtn.title = "곡 전용 음반 이미지";
+        artBtn.innerHTML = '<i class="fa-solid fa-compact-disc"></i>';
+        artBtn.onclick = () => requestTrackArtUpload(track.id);
+
+        const backgroundBtn = document.createElement("button");
+        backgroundBtn.type = "button";
+        backgroundBtn.className = "mini-btn";
+        backgroundBtn.title = "곡 전용 배경 이미지";
+        backgroundBtn.innerHTML = '<i class="fa-solid fa-image"></i>';
+        backgroundBtn.onclick = () => requestTrackBackgroundUpload(track.id);
+
+        const addBtn = document.createElement("button");
+        addBtn.type = "button";
+        addBtn.className = "nav-btn";
+        const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
+        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
+        addBtn.disabled = alreadyAdded;
+        addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "mini-btn";
+        deleteBtn.title = "보관함에서 영구 삭제";
+        deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+        deleteBtn.onclick = () => deleteTrackFromLibrary(track.id);
+
+        actions.append(rotateBtn, artBtn, backgroundBtn, addBtn, deleteBtn);
+        row.append(meta, actions);
+        libraryPickerList.appendChild(row);
+    });
 }
 
 function renderLibraryPickerIfVisible() {

@@ -289,6 +289,11 @@ body.is-main-edit-mode .editable-welcome:focus-visible {
     left: 24px;
     bottom: 24px;
     z-index: 2405;
+    display: none;
+}
+
+body.is-main-edit-mode .main-preset-controls {
+    display: block;
 }
 
 .main-preset-panel {
@@ -508,6 +513,14 @@ body.is-main-edit-mode .main-custom-item {
     outline-offset: 8px;
 }
 
+body.is-main-edit-mode .main-logo-wrap img,
+body.is-main-edit-mode .shortcut-link img,
+body.is-main-edit-mode .main-custom-image,
+body.is-main-edit-mode .image-upload-box img,
+body.is-main-edit-mode .profile-preview img {
+    filter: drop-shadow(0 0 12px rgba(98, 231, 255, 0.55)) drop-shadow(0 0 28px rgba(98, 231, 255, 0.28));
+}
+
 #profile-page { padding-top: 120px; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding-bottom: 50px; }
 .profile-container { background: white; padding: 40px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); width: 100%; max-width: 800px; }
 .section-title { font-size: 1.8rem; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
@@ -704,6 +717,8 @@ body.has-custom-wallpaper #music-page::before {
     --music-action-text-opacity: 1;
     --music-action-text-stroke-opacity: 0.6;
     --music-action-text-neon-opacity: 0.18;
+    --music-track-bg-overlay: 0;
+    --music-track-bg-url: none;
 }
 
 #video-page {
@@ -1083,12 +1098,32 @@ body.has-custom-wallpaper #music-page::before {
 #music-page::before {
     content: '';
     position: absolute;
-    width: 760px; height: 760px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(17,17,17,0.05) 0%, rgba(17,17,17,0.02) 32%, transparent 68%);
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
+    inset: 0;
+    background:
+        linear-gradient(rgba(255,255,255,calc(0.82 - var(--music-track-bg-overlay) * 0.12)), rgba(255,255,255,calc(0.9 - var(--music-track-bg-overlay) * 0.15))),
+        var(--music-track-bg-url),
+        radial-gradient(circle, rgba(17,17,17,0.05) 0%, rgba(17,17,17,0.02) 32%, transparent 68%);
+    background-size: cover, cover, 760px 760px;
+    background-position: center, center, center;
+    background-repeat: no-repeat;
     pointer-events: none;
+    opacity: calc(0.24 + var(--music-track-bg-overlay) * 0.76);
+}
+
+#music-page.track-backdrop-refresh::before {
+    animation: musicBackdropFade 0.8s ease;
+}
+
+#music-page.has-track-background::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 28% 24%, rgba(255,255,255,0.26), transparent 22%),
+        radial-gradient(circle at 68% 74%, rgba(116,214,255,0.14), transparent 24%);
+    pointer-events: none;
+    opacity: 0.65;
+    animation: musicBackdropFloat 10s ease-in-out infinite alternate;
 }
 
 .music-layout {
@@ -1243,6 +1278,10 @@ body.has-custom-wallpaper #music-page::before {
         0 30px 70px rgba(0,0,0,0.22),
         inset 0 0 0 1px rgba(255,255,255,0.08);
     animation: record-spin 4.8s linear infinite;
+}
+
+.record-disc.is-playing.no-rotation {
+    animation: none;
 }
 
 .record-label {
@@ -1533,9 +1572,42 @@ body.has-custom-wallpaper #music-page::before {
     transform: none;
 }
 
+.playback-volume-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 150px;
+    padding: 0 4px;
+    color: rgba(var(--music-text-color), var(--music-text-opacity));
+    -webkit-text-stroke: 0.7px rgba(var(--music-text-stroke), calc(var(--music-text-stroke-opacity) * 0.75));
+    text-shadow: 0 0 12px rgba(var(--music-text-neon), calc(var(--music-text-neon-opacity) * 0.9));
+}
+
+.playback-volume {
+    width: 96px;
+    accent-color: rgba(var(--music-progress-fill), var(--music-progress-fill-opacity));
+    filter: drop-shadow(0 0 8px rgba(var(--music-progress-neon), var(--music-progress-neon-opacity)));
+}
+
 @keyframes record-spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+@keyframes musicBackdropFade {
+    from {
+        opacity: 0;
+        transform: scale(1.02);
+    }
+    to {
+        opacity: calc(0.24 + var(--music-track-bg-overlay) * 0.76);
+        transform: scale(1);
+    }
+}
+
+@keyframes musicBackdropFloat {
+    from { transform: translate3d(0, 0, 0); }
+    to { transform: translate3d(0, -12px, 0); }
 }
 
 @keyframes rainbow-sheen {

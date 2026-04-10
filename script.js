@@ -59,6 +59,7 @@ const resetBackgroundImageBtn = document.getElementById("reset-background-image"
 const backgroundImageInput = document.getElementById("background-image-input");
 const backgroundImageLibrary = document.getElementById("background-image-library");
 const applyHeaderWallpaperInput = document.getElementById("apply-header-wallpaper");
+const applyMusicHeaderWallpaperInput = document.getElementById("apply-music-header-wallpaper");
 const musicBackgroundOpacityInput = document.getElementById("music-background-opacity");
 const mainLogoWrap = document.getElementById("main-logo-wrap");
 const mainCenterLogo = document.getElementById("main-center-logo");
@@ -560,6 +561,7 @@ function loadSettings() {
     const logoNeonColor = currentUser?.logoNeonColor || "";
     const cursorStyle = currentUser?.cursorStyle || "default";
     const showShortcuts = currentUser?.showShortcuts !== false;
+    const applyMusicHeaderWallpaper = currentUser?.applyMusicHeaderWallpaper !== false;
     const musicBackgroundOpacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
         ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
         : 1;
@@ -589,6 +591,7 @@ function loadSettings() {
     logoNeonHoverColorInput.value = logoNeonColor || "#62e7ff";
     cursorStyleSelect.value = cursorStyle;
     showShortcutsToggle.checked = showShortcuts;
+    applyMusicHeaderWallpaperInput.checked = applyMusicHeaderWallpaper;
     musicBackgroundOpacityInput.value = String(Math.round(musicBackgroundOpacity * 100));
     pendingBackgroundImage = null;
     pendingBackgroundReset = false;
@@ -2186,6 +2189,7 @@ function handleSignup() {
         logoNeonColor: "",
         cursorStyle: "default",
         showShortcuts: true,
+        applyMusicHeaderWallpaper: true,
         musicBackgroundOpacity: 1,
         profileImageHistory: [],
         backgroundImageHistory: [],
@@ -2409,6 +2413,7 @@ async function saveProfileSettings() {
         users[currentIndex].logoNeonColor = logoNeonHoverColorInput.value;
         users[currentIndex].cursorStyle = cursorStyleSelect.value;
         users[currentIndex].showShortcuts = showShortcutsToggle.checked;
+        users[currentIndex].applyMusicHeaderWallpaper = applyMusicHeaderWallpaperInput.checked;
         users[currentIndex].musicBackgroundOpacity = Math.min(1, Math.max(0, Number(musicBackgroundOpacityInput.value || 100) / 100));
         if (pendingBackgroundReset) {
             users[currentIndex].backgroundImage = "";
@@ -2639,6 +2644,7 @@ function migrateLegacyUserData() {
         logoNeonColor: "#62e7ff",
         cursorStyle: "default",
         showShortcuts: true,
+        applyMusicHeaderWallpaper: true,
         musicBackgroundOpacity: 1,
         profileImageHistory: [],
         backgroundImageHistory: [],
@@ -4637,6 +4643,8 @@ function applyMusicTrackBackdrop() {
     const musicBackgroundOpacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
         ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
         : Math.min(1, Math.max(0, Number(musicBackgroundOpacityInput?.value || 100) / 100));
+    const applyMusicHeaderWallpaper = currentUser?.applyMusicHeaderWallpaper !== false
+        && Boolean(applyMusicHeaderWallpaperInput?.checked ?? true);
     const wallpaperImage = pendingBackgroundImage !== null
         ? pendingBackgroundImage
         : (currentUser?.backgroundImage || "");
@@ -4657,7 +4665,7 @@ function applyMusicTrackBackdrop() {
     musicPage.classList.add("has-track-background");
     musicPage.style.setProperty("--music-track-bg-url", `url("${backgroundArt}")`);
     musicPage.style.setProperty("--music-track-bg-opacity", String(musicBackgroundOpacity));
-    if (isMusicPageVisible) {
+    if (isMusicPageVisible && applyMusicHeaderWallpaper) {
         pageHeader.style.setProperty("background-color", "#ffffff", "important");
         pageHeader.style.setProperty(
             "background-image",
@@ -4667,6 +4675,8 @@ function applyMusicTrackBackdrop() {
         pageHeader.style.setProperty("background-position", "center top", "important");
         pageHeader.style.setProperty("background-size", "cover", "important");
         pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+    } else if (isMusicPageVisible) {
+        applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
     }
 
     if (hasChanged) {

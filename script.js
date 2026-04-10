@@ -2146,6 +2146,15 @@ function showPage(pageId) {
     Object.values(sidebarItems).forEach((item) => item && item.classList.remove("active"));
     if (sidebarItems[pageId]) sidebarItems[pageId].classList.add("active");
 
+    if (pageId !== "music-page") {
+        const currentUser = getCurrentUser();
+        const wallpaperImage = pendingBackgroundImage !== null
+            ? pendingBackgroundImage
+            : (currentUser?.backgroundImage || "");
+        const applyHeaderWallpaper = Boolean(applyHeaderWallpaperInput?.checked || currentUser?.applyHeaderWallpaper);
+        applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+    }
+
     if (pageId === "music-page") {
         renderMusicUI();
     }
@@ -4620,6 +4629,7 @@ function applyRecordAppearance() {
 function applyMusicTrackBackdrop() {
     const musicPage = document.getElementById("music-page");
     if (!musicPage) return;
+    const isMusicPageVisible = !musicPage.classList.contains("hidden");
 
     const activeTrack = getTrackForMusicVisuals();
     const backgroundArt = activeTrack?.customBackgroundArt || "";
@@ -4636,7 +4646,9 @@ function applyMusicTrackBackdrop() {
         lastAppliedMusicBackground = "";
         musicPage.classList.remove("has-track-background", "track-backdrop-refresh");
         musicPage.style.setProperty("--music-track-bg-url", "none");
-        applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        if (isMusicPageVisible) {
+            applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        }
         return;
     }
 
@@ -4645,15 +4657,17 @@ function applyMusicTrackBackdrop() {
     musicPage.classList.add("has-track-background");
     musicPage.style.setProperty("--music-track-bg-url", `url("${backgroundArt}")`);
     musicPage.style.setProperty("--music-track-bg-opacity", String(musicBackgroundOpacity));
-    pageHeader.style.setProperty("background-color", "#ffffff", "important");
-    pageHeader.style.setProperty(
-        "background-image",
-        `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(${backgroundArt})`,
-        "important"
-    );
-    pageHeader.style.setProperty("background-position", "center", "important");
-    pageHeader.style.setProperty("background-size", "cover", "important");
-    pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+    if (isMusicPageVisible) {
+        pageHeader.style.setProperty("background-color", "#ffffff", "important");
+        pageHeader.style.setProperty(
+            "background-image",
+            `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(${backgroundArt})`,
+            "important"
+        );
+        pageHeader.style.setProperty("background-position", "center", "important");
+        pageHeader.style.setProperty("background-size", "cover", "important");
+        pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+    }
 
     if (hasChanged) {
         musicPage.classList.remove("track-backdrop-refresh");

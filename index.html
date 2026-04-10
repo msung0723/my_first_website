@@ -589,6 +589,7 @@
                 </div>
                 <button id="video-tag-filter-toggle" class="nav-btn" type="button">태그로 검색</button>
             </div>
+            <button id="video-trash-toggle" class="nav-btn video-trash-btn" type="button">휴지통</button>
             <div id="video-tag-filter-panel" class="video-tag-filter-panel hidden">
                 <div id="video-selected-tags" class="video-tag-row"></div>
                 <div id="video-all-tags" class="video-tag-row"></div>
@@ -616,6 +617,9 @@
                     <button id="video-save-meta-btn" class="nav-btn" type="button">저장하기</button>
                     <div id="video-current-tags" class="video-current-tags"></div>
                     <div class="video-viewer-actions">
+                        <button id="video-delete-btn" class="playback-circle-btn" type="button" aria-label="영상 삭제">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
                         <button id="video-mini-btn" class="playback-circle-btn" type="button" aria-label="작은 화면으로 보기">
                             <i class="fa-solid fa-down-left-and-up-right-to-center"></i>
                         </button>
@@ -646,6 +650,16 @@
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowfullscreen>
         </iframe>
+
+        <div id="video-trash-modal" class="hidden auth-overlay">
+            <div class="auth-box playlist-editor-box">
+                <div class="playlist-editor-header">
+                    <h3>영상 휴지통</h3>
+                    <button id="close-video-trash" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="playlist-edit-list" id="video-trash-list"></div>
+            </div>
+        </div>
     </section>
 
     <script src="script.js"></script>

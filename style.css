@@ -822,6 +822,12 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
     margin-bottom: 22px;
 }
 
+.video-trash-btn {
+    margin-left: auto;
+    margin-bottom: 14px;
+    display: inline-flex;
+}
+
 .video-tag-row {
     display: flex;
     flex-wrap: wrap;
@@ -1005,6 +1011,11 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
     height: 100%;
 }
 
+.video-player-frame-host,
+.mini-video-body {
+    position: relative;
+}
+
 .video-player-stage {
     background: #0b1015;
     border-radius: 24px;
@@ -1016,6 +1027,13 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
     width: 100%;
     height: 100%;
     border: none;
+}
+
+#video-player-frame {
+    position: fixed;
+    z-index: 2350;
+    border: none;
+    background: #0b1015;
 }
 
 .video-info-panel {
@@ -1123,6 +1141,9 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
     bottom: 30px;
     width: 320px;
     height: 220px;
+    min-width: 260px;
+    min-height: 180px;
+    resize: both;
     background: white;
     border-radius: 24px;
     box-shadow: 0 24px 40px rgba(17,17,17,0.16);

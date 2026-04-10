@@ -209,6 +209,7 @@ const videoTitleInput = document.getElementById("video-title-input");
 const saveVideoBtn = document.getElementById("save-video-btn");
 const videoSearchInput = document.getElementById("video-search-input");
 const videoTagFilterToggle = document.getElementById("video-tag-filter-toggle");
+const videoTrashToggle = document.getElementById("video-trash-toggle");
 const videoTagFilterPanel = document.getElementById("video-tag-filter-panel");
 const videoSelectedTags = document.getElementById("video-selected-tags");
 const videoAllTags = document.getElementById("video-all-tags");
@@ -222,6 +223,10 @@ const videoPlayerFrame = document.getElementById("video-player-frame");
 const videoEditorTitle = document.getElementById("video-editor-title");
 const videoEditorDescription = document.getElementById("video-editor-description");
 const videoSaveMetaBtn = document.getElementById("video-save-meta-btn");
+const videoDeleteBtn = document.getElementById("video-delete-btn");
+const videoTrashModal = document.getElementById("video-trash-modal");
+const closeVideoTrashBtn = document.getElementById("close-video-trash");
+const videoTrashList = document.getElementById("video-trash-list");
 const videoTagInput = document.getElementById("video-tag-input");
 const videoAddTagBtn = document.getElementById("video-add-tag-btn");
 const videoCurrentTags = document.getElementById("video-current-tags");
@@ -240,6 +245,7 @@ const SHORTCUTS_KEY = "magnusShortcutsV2";
 const MUSIC_LIBRARY_KEY_PREFIX = "musicLibraryMetaV3";
 const MUSIC_STATE_KEY_PREFIX = "musicStateV3";
 const VIDEO_LIBRARY_KEY_PREFIX = "videoLibraryV1";
+const VIDEO_TRASH_KEY_PREFIX = "videoTrashV1";
 const MUSIC_DB_NAME = "magnusMusicDB";
 const MUSIC_STORE_NAME = "tracks";
 const DEFAULT_PLAYLIST_NAME = "기본 재생목록";
@@ -266,6 +272,7 @@ let pendingTrackBackgroundTargetId = null;
 let lastAppliedMusicBackground = "";
 let playlistAnimationTimer = null;
 let lastRenderedPlaylistIndex = null;
+let videoFrameResizeObserver = null;
 let activeDragState = null;
 let guestVideos = [];
 let profileCropDraft = null;
@@ -317,6 +324,7 @@ let musicState = {
 };
 let videoState = {
     library: [],
+    trash: [],
     search: "",
     activeTags: [],
     currentVideoId: null,
@@ -4975,8 +4983,16 @@ function getVideoLibraryKeyForUser(userId) {
     return userId ? `${VIDEO_LIBRARY_KEY_PREFIX}:${userId}` : null;
 }
 
+function getVideoTrashKeyForUser(userId) {
+    return userId ? `${VIDEO_TRASH_KEY_PREFIX}:${userId}` : null;
+}
+
 function getScopedVideoLibraryKey() {
     return getVideoLibraryKeyForUser(getCurrentUserId());
+}
+
+function getScopedVideoTrashKey() {
+    return getVideoTrashKeyForUser(getCurrentUserId());
 }
 
 function initVideoPage() {
@@ -4985,6 +5001,12 @@ function initVideoPage() {
     }
     if (miniVideoPlayer?.parentElement !== document.body) {
         document.body.appendChild(miniVideoPlayer);
+    }
+    if (!videoFrameResizeObserver && typeof ResizeObserver !== "undefined") {
+        videoFrameResizeObserver = new ResizeObserver(() => refreshVideoFrameLayout());
+        [videoPlayerMainHost, videoPlayerMiniHost, miniVideoPlayer].forEach((element) => {
+            if (element) videoFrameResizeObserver.observe(element);
+        });
     }
     bindVideoEvents();
     loadVideoState();
@@ -5000,9 +5022,12 @@ function bindVideoEvents() {
         renderVideoUI();
     });
     videoTagFilterToggle.onclick = () => videoTagFilterPanel.classList.toggle("hidden");
+    videoTrashToggle.onclick = () => openVideoTrashModal();
+    closeVideoTrashBtn.onclick = () => videoTrashModal.classList.add("hidden");
     videoEditorTitle.addEventListener("input", updateCurrentVideoMeta);
     videoEditorDescription.addEventListener("input", updateCurrentVideoMeta);
     videoSaveMetaBtn.onclick = () => saveCurrentVideoMeta();
+    videoDeleteBtn.onclick = () => deleteCurrentVideo();
     videoAddTagBtn.onclick = () => addTagToCurrentVideo();
     videoTagInput.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
@@ -5016,21 +5041,27 @@ function bindVideoEvents() {
     miniVideoCloseBtn.onclick = () => closeVideoViewer(true);
     videoViewerBackdrop.onclick = () => closeVideoViewer(true);
     document.addEventListener("keydown", handleVideoViewerKeydown);
+    window.addEventListener("resize", refreshVideoFrameLayout);
 }
 
 function loadVideoState() {
     const key = getScopedVideoLibraryKey();
+    const trashKey = getScopedVideoTrashKey();
     if (!key) {
         videoState.library = guestVideos;
+        videoState.trash = Array.isArray(videoState.trash) ? videoState.trash : [];
         return;
     }
 
     const saved = JSON.parse(localStorage.getItem(key) || "[]");
+    const savedTrash = JSON.parse(localStorage.getItem(trashKey) || "[]");
     videoState.library = Array.isArray(saved) ? saved : [];
+    videoState.trash = Array.isArray(savedTrash) ? savedTrash : [];
 }
 
 function saveVideoState() {
     const key = getScopedVideoLibraryKey();
+    const trashKey = getScopedVideoTrashKey();
     if (!key) {
         guestVideos = [...videoState.library];
         return true;
@@ -5038,6 +5069,7 @@ function saveVideoState() {
 
     try {
         localStorage.setItem(key, JSON.stringify(videoState.library));
+        localStorage.setItem(trashKey, JSON.stringify(videoState.trash || []));
         return true;
     } catch (error) {
         console.error("Failed to save video state", error);
@@ -5093,6 +5125,56 @@ function renderVideoUI() {
     renderVideoGrid();
     renderVideoTagFilters();
     syncVideoViewer();
+}
+
+function openVideoTrashModal() {
+    renderVideoTrashList();
+    videoTrashModal.classList.remove("hidden");
+}
+
+function renderVideoTrashList() {
+    videoTrashList.innerHTML = "";
+
+    if (!videoState.trash?.length) {
+        const empty = document.createElement("div");
+        empty.className = "playlist-edit-subtitle";
+        empty.textContent = "휴지통에 영상이 없습니다.";
+        videoTrashList.appendChild(empty);
+        return;
+    }
+
+    videoState.trash.forEach((video) => {
+        const row = document.createElement("div");
+        row.className = "library-picker-item";
+
+        const meta = document.createElement("div");
+        meta.className = "playlist-edit-meta";
+        meta.innerHTML = `
+            <div class="playlist-edit-title">${escapeHtml(video.title || "이름 없는 영상")}</div>
+            <div class="playlist-edit-subtitle">${escapeHtml(video.description || "설명 없음")}</div>
+            <div class="library-picker-type">${(video.tags || []).length ? (video.tags || []).map((tag) => `#${escapeHtml(tag)}`).join(" ") : "태그 없음"}</div>
+        `;
+
+        const actions = document.createElement("div");
+        actions.className = "library-picker-actions";
+
+        const restoreBtn = document.createElement("button");
+        restoreBtn.type = "button";
+        restoreBtn.className = "nav-btn";
+        restoreBtn.textContent = "복구";
+        restoreBtn.onclick = () => restoreVideoFromTrash(video.id);
+
+        const purgeBtn = document.createElement("button");
+        purgeBtn.type = "button";
+        purgeBtn.className = "mini-btn";
+        purgeBtn.title = "영구 삭제";
+        purgeBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+        purgeBtn.onclick = () => deleteVideoPermanently(video.id);
+
+        actions.append(restoreBtn, purgeBtn);
+        row.append(meta, actions);
+        videoTrashList.appendChild(row);
+    });
 }
 
 function getFilteredVideos() {
@@ -5178,7 +5260,6 @@ function toggleVideoTagFilter(tag) {
 function openVideoViewer(videoId) {
     videoState.currentVideoId = videoId;
     videoState.isMiniPlayer = false;
-    attachVideoPlayer(videoPlayerMainHost, true);
     videoViewer.classList.remove("hidden");
     miniVideoPlayer.classList.add("hidden");
     syncVideoViewer();
@@ -5187,15 +5268,31 @@ function openVideoViewer(videoId) {
 function attachVideoPlayer(host, autoplay) {
     const currentVideo = getCurrentVideo();
     if (!host || !currentVideo) return;
-    const src = `https://www.youtube.com/embed/${currentVideo.youtubeId}?autoplay=${autoplay ? 1 : 0}&rel=0&modestbranding=1`;
-    if (videoPlayerFrame.parentElement !== host) {
-        host.appendChild(videoPlayerFrame);
-    }
+    const src = `https://www.youtube.com/embed/${currentVideo.youtubeId}?autoplay=${autoplay ? 1 : 0}&rel=0&modestbranding=1&enablejsapi=1`;
     if (videoPlayerFrame.dataset.videoId !== currentVideo.youtubeId || videoPlayerFrame.src !== src) {
         videoPlayerFrame.src = src;
         videoPlayerFrame.dataset.videoId = currentVideo.youtubeId;
     }
     videoPlayerFrame.classList.remove("hidden");
+    requestAnimationFrame(() => positionVideoFrameOver(host));
+}
+
+function positionVideoFrameOver(host) {
+    if (!host || videoPlayerFrame.classList.contains("hidden")) return;
+    const rect = host.getBoundingClientRect();
+    videoPlayerFrame.style.left = `${rect.left}px`;
+    videoPlayerFrame.style.top = `${rect.top}px`;
+    videoPlayerFrame.style.width = `${rect.width}px`;
+    videoPlayerFrame.style.height = `${rect.height}px`;
+}
+
+function refreshVideoFrameLayout() {
+    const currentVideo = getCurrentVideo();
+    if (!currentVideo) return;
+    const host = videoState.isMiniPlayer ? videoPlayerMiniHost : videoPlayerMainHost;
+    if (host) {
+        requestAnimationFrame(() => positionVideoFrameOver(host));
+    }
 }
 
 function getCurrentVideo() {
@@ -5207,6 +5304,7 @@ function syncVideoViewer() {
     if (!currentVideo) {
         videoViewer.classList.add("hidden");
         miniVideoPlayer.classList.add("hidden");
+        videoPlayerFrame.classList.add("hidden");
         return;
     }
 
@@ -5255,6 +5353,53 @@ function saveCurrentVideoMeta() {
     saveVideoState();
 }
 
+function deleteCurrentVideo() {
+    const currentVideo = getCurrentVideo();
+    if (!currentVideo) return;
+
+    const confirmed = confirm("정말 지우겠습니까?");
+    if (!confirmed) return;
+
+    videoState.trash = [
+        {
+            ...currentVideo,
+            deletedAt: Date.now()
+        },
+        ...(videoState.trash || [])
+    ];
+    videoState.library = videoState.library.filter((video) => video.id !== currentVideo.id);
+    saveVideoState();
+    closeVideoViewer(true);
+    renderVideoUI();
+}
+
+function restoreVideoFromTrash(videoId) {
+    const target = (videoState.trash || []).find((video) => video.id === videoId);
+    if (!target) return;
+
+    videoState.library.unshift({
+        id: target.id,
+        youtubeId: target.youtubeId,
+        youtubeUrl: target.youtubeUrl,
+        title: target.title,
+        description: target.description || "",
+        tags: [...(target.tags || [])]
+    });
+    videoState.trash = (videoState.trash || []).filter((video) => video.id !== videoId);
+    saveVideoState();
+    renderVideoUI();
+    renderVideoTrashList();
+}
+
+function deleteVideoPermanently(videoId) {
+    const confirmed = confirm("휴지통에서도 완전히 지우겠습니까?");
+    if (!confirmed) return;
+
+    videoState.trash = (videoState.trash || []).filter((video) => video.id !== videoId);
+    saveVideoState();
+    renderVideoTrashList();
+}
+
 function addTagToCurrentVideo() {
     const currentVideo = getCurrentVideo();
     const tag = videoTagInput.value.trim();
@@ -5290,6 +5435,10 @@ function closeVideoViewer(clearCurrent) {
     videoPlayerFrame.src = "";
     delete videoPlayerFrame.dataset.videoId;
     videoPlayerFrame.classList.add("hidden");
+    videoPlayerFrame.style.left = "";
+    videoPlayerFrame.style.top = "";
+    videoPlayerFrame.style.width = "";
+    videoPlayerFrame.style.height = "";
     videoViewer.classList.add("hidden");
     miniVideoPlayer.classList.add("hidden");
     if (clearCurrent) {

@@ -1165,7 +1165,6 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
 }
 
 #music-page.has-track-background::before {
-    opacity: var(--music-track-bg-opacity);
     background-image: var(--music-track-bg-url);
     background-size: cover;
     background-position: center;
@@ -1832,25 +1831,18 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
     align-items: center;
     min-height: 196px;
     justify-content: center;
-    overflow: hidden;
 }
 
-.playlist-items.is-moving-up .playlist-item {
-    animation: playlist-flow-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+.playlist-items.is-switching .playlist-item {
+    animation: playlist-slide 0.34s ease both;
 }
 
-.playlist-items.is-moving-down .playlist-item {
-    animation: playlist-flow-down 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.playlist-items.is-moving-up .playlist-item:nth-child(2),
-.playlist-items.is-moving-down .playlist-item:nth-child(2) {
-    animation-delay: 0.02s;
-}
-
-.playlist-items.is-moving-up .playlist-item:nth-child(3),
-.playlist-items.is-moving-down .playlist-item:nth-child(3) {
+.playlist-items.is-switching .playlist-item:nth-child(2) {
     animation-delay: 0.04s;
+}
+
+.playlist-items.is-switching .playlist-item:nth-child(3) {
+    animation-delay: 0.08s;
 }
 
 .playlist-item {
@@ -1864,7 +1856,7 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
     font-size: 1rem;
     font-weight: 600;
     text-align: center;
-    transition: color 0.22s ease, transform 0.22s ease, text-shadow 0.22s ease;
+    transition: all 0.25s;
     cursor: pointer;
     white-space: nowrap;
     overflow: hidden;
@@ -1900,24 +1892,6 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
 .playlist-item:hover:not(.is-selected) {
     color: rgba(var(--music-text-color), var(--music-text-opacity));
     transform: translateY(-1px);
-}
-
-@keyframes playlist-flow-up {
-    from {
-        transform: translateY(28px);
-    }
-    to {
-        transform: translateY(0);
-    }
-}
-
-@keyframes playlist-flow-down {
-    from {
-        transform: translateY(-28px);
-    }
-    to {
-        transform: translateY(0);
-    }
 }
 
 .music-edit-controls {

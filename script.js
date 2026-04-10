@@ -264,7 +264,6 @@ let pendingTrackArtTargetId = null;
 let pendingTrackBackgroundTargetId = null;
 let lastAppliedMusicBackground = "";
 let playlistAnimationTimer = null;
-let lastRenderedPlaylistIndex = null;
 let activeDragState = null;
 let guestVideos = [];
 let profileCropDraft = null;
@@ -703,7 +702,6 @@ function applySiteWallpaper(imageData, applyToHeader) {
 function applyMusicBackgroundOpacity(opacityValue) {
     const nextOpacity = Number.isFinite(opacityValue) ? Math.min(1, Math.max(0, opacityValue)) : 1;
     document.documentElement.style.setProperty("--music-track-bg-opacity", String(nextOpacity));
-    document.getElementById("music-page")?.style.setProperty("--music-track-bg-opacity", String(nextOpacity));
 }
 
 function applyLogoNeonColor(color) {
@@ -3085,19 +3083,13 @@ function renderPlaylist() {
     const playlist = getCurrentPlaylist();
     const trackIds = playlist ? playlist.trackIds : [];
     const selectedIndex = trackIds.indexOf(musicState.selectedTrackId);
-    const previousIndex = lastRenderedPlaylistIndex;
-    const movementClass = previousIndex === null || selectedIndex === previousIndex
-        ? ""
-        : (selectedIndex > previousIndex ? "is-moving-up" : "is-moving-down");
 
     playlistItemsEl.innerHTML = "";
-    playlistItemsEl.classList.remove("is-moving-up", "is-moving-down");
 
     if (!trackIds.length) {
         playlistUpBtn.disabled = true;
         playlistDownBtn.disabled = true;
         musicEmptyState.classList.remove("hidden");
-        lastRenderedPlaylistIndex = null;
         return;
     }
 
@@ -3863,19 +3855,13 @@ function renderPlaylist() {
     const playlist = getCurrentPlaylist();
     const trackIds = playlist ? playlist.trackIds : [];
     const selectedIndex = trackIds.indexOf(musicState.selectedTrackId);
-    const previousIndex = lastRenderedPlaylistIndex;
-    const movementClass = previousIndex === null || selectedIndex === previousIndex
-        ? ""
-        : (selectedIndex > previousIndex ? "is-moving-up" : "is-moving-down");
 
     playlistItemsEl.innerHTML = "";
-    playlistItemsEl.classList.remove("is-moving-up", "is-moving-down");
 
     if (!trackIds.length) {
         playlistUpBtn.disabled = true;
         playlistDownBtn.disabled = true;
         musicEmptyState.classList.remove("hidden");
-        lastRenderedPlaylistIndex = null;
         return;
     }
 
@@ -3916,15 +3902,13 @@ function renderPlaylist() {
         playlistItemsEl.appendChild(item);
     });
 
-    lastRenderedPlaylistIndex = selectedIndex;
-    if (movementClass) {
-        void playlistItemsEl.offsetWidth;
-        playlistItemsEl.classList.add(movementClass);
-        if (playlistAnimationTimer) clearTimeout(playlistAnimationTimer);
-        playlistAnimationTimer = setTimeout(() => {
-            playlistItemsEl.classList.remove("is-moving-up", "is-moving-down");
-        }, 360);
-    }
+    playlistItemsEl.classList.remove("is-switching");
+    void playlistItemsEl.offsetWidth;
+    playlistItemsEl.classList.add("is-switching");
+    if (playlistAnimationTimer) clearTimeout(playlistAnimationTimer);
+    playlistAnimationTimer = setTimeout(() => {
+        playlistItemsEl.classList.remove("is-switching");
+    }, 420);
 }
 
 function updatePlaybackTexts() {
@@ -4623,20 +4607,11 @@ function applyMusicTrackBackdrop() {
 
     const activeTrack = getTrackForMusicVisuals();
     const backgroundArt = activeTrack?.customBackgroundArt || "";
-    const currentUser = getCurrentUser();
-    const musicBackgroundOpacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
-        ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
-        : Math.min(1, Math.max(0, Number(musicBackgroundOpacityInput?.value || 100) / 100));
-    const wallpaperImage = pendingBackgroundImage !== null
-        ? pendingBackgroundImage
-        : (currentUser?.backgroundImage || "");
-    const applyHeaderWallpaper = Boolean(applyHeaderWallpaperInput?.checked || currentUser?.applyHeaderWallpaper);
 
     if (!backgroundArt) {
         lastAppliedMusicBackground = "";
         musicPage.classList.remove("has-track-background", "track-backdrop-refresh");
         musicPage.style.setProperty("--music-track-bg-url", "none");
-        applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
         return;
     }
 
@@ -4644,16 +4619,6 @@ function applyMusicTrackBackdrop() {
     lastAppliedMusicBackground = backgroundArt;
     musicPage.classList.add("has-track-background");
     musicPage.style.setProperty("--music-track-bg-url", `url("${backgroundArt}")`);
-    musicPage.style.setProperty("--music-track-bg-opacity", String(musicBackgroundOpacity));
-    pageHeader.style.setProperty("background-color", "#ffffff", "important");
-    pageHeader.style.setProperty(
-        "background-image",
-        `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(${backgroundArt})`,
-        "important"
-    );
-    pageHeader.style.setProperty("background-position", "center", "important");
-    pageHeader.style.setProperty("background-size", "cover", "important");
-    pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
 
     if (hasChanged) {
         musicPage.classList.remove("track-backdrop-refresh");

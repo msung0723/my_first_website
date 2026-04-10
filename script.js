@@ -4664,7 +4664,7 @@ function applyMusicTrackBackdrop() {
             `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(${backgroundArt})`,
             "important"
         );
-        pageHeader.style.setProperty("background-position", "center", "important");
+        pageHeader.style.setProperty("background-position", "center top", "important");
         pageHeader.style.setProperty("background-size", "cover", "important");
         pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
     }

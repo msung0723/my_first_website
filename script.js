@@ -105,6 +105,56 @@ const playbackDuration = document.getElementById("playback-duration");
 const playbackProgress = document.getElementById("playback-progress");
 const repeatToggleBtn = document.getElementById("repeat-toggle");
 const autoplayToggleBtn = document.getElementById("autoplay-toggle");
+const musicStyleEditBtn = document.getElementById("music-style-edit-btn");
+const musicStyleCloseBtn = document.getElementById("music-style-close-btn");
+const musicStylePanel = document.getElementById("music-style-panel");
+const musicBarBgColorInput = document.getElementById("music-bar-bg-color");
+const musicBarBorderColorInput = document.getElementById("music-bar-border-color");
+const musicBarNeonColorInput = document.getElementById("music-bar-neon-color");
+const musicBarOpacityInput = document.getElementById("music-bar-opacity");
+const musicBarOpacityFillInput = document.getElementById("music-bar-opacity-fill");
+const musicBarOpacityBorderInput = document.getElementById("music-bar-opacity-border");
+const musicBarOpacityNeonInput = document.getElementById("music-bar-opacity-neon");
+const musicTextColorInput = document.getElementById("music-text-color");
+const musicTextStrokeColorInput = document.getElementById("music-text-stroke-color");
+const musicTextNeonColorInput = document.getElementById("music-text-neon-color");
+const musicTextOpacityInput = document.getElementById("music-text-opacity");
+const musicTextOpacityFillInput = document.getElementById("music-text-opacity-fill");
+const musicTextOpacityBorderInput = document.getElementById("music-text-opacity-border");
+const musicTextOpacityNeonInput = document.getElementById("music-text-opacity-neon");
+const musicNowColorInput = document.getElementById("music-now-color");
+const musicNowStrokeColorInput = document.getElementById("music-now-stroke-color");
+const musicNowNeonColorInput = document.getElementById("music-now-neon-color");
+const musicNowOpacityInput = document.getElementById("music-now-opacity");
+const musicNowOpacityFillInput = document.getElementById("music-now-opacity-fill");
+const musicNowOpacityBorderInput = document.getElementById("music-now-opacity-border");
+const musicNowOpacityNeonInput = document.getElementById("music-now-opacity-neon");
+const musicProgressColorInput = document.getElementById("music-progress-color");
+const musicProgressBorderColorInput = document.getElementById("music-progress-border-color");
+const musicProgressNeonColorInput = document.getElementById("music-progress-neon-color");
+const musicProgressOpacityInput = document.getElementById("music-progress-opacity");
+const musicProgressOpacityFillInput = document.getElementById("music-progress-opacity-fill");
+const musicProgressOpacityBorderInput = document.getElementById("music-progress-opacity-border");
+const musicProgressOpacityNeonInput = document.getElementById("music-progress-opacity-neon");
+const musicRecordNeonColorInput = document.getElementById("music-record-neon-color");
+const musicRecordOpacityInput = document.getElementById("music-record-opacity");
+const musicRecordOpacityFillInput = document.getElementById("music-record-opacity-fill");
+const musicRecordOpacityBorderInput = document.getElementById("music-record-opacity-border");
+const musicRecordOpacityNeonInput = document.getElementById("music-record-opacity-neon");
+const musicActionBgColorInput = document.getElementById("music-action-bg-color");
+const musicActionBorderColorInput = document.getElementById("music-action-border-color");
+const musicActionNeonColorInput = document.getElementById("music-action-neon-color");
+const musicActionOpacityInput = document.getElementById("music-action-opacity");
+const musicActionOpacityFillInput = document.getElementById("music-action-opacity-fill");
+const musicActionOpacityBorderInput = document.getElementById("music-action-opacity-border");
+const musicActionOpacityNeonInput = document.getElementById("music-action-opacity-neon");
+const musicActionTextColorInput = document.getElementById("music-action-text-color");
+const musicActionTextStrokeColorInput = document.getElementById("music-action-text-stroke-color");
+const musicActionTextNeonColorInput = document.getElementById("music-action-text-neon-color");
+const musicActionTextOpacityInput = document.getElementById("music-action-text-opacity");
+const musicActionTextOpacityFillInput = document.getElementById("music-action-text-opacity-fill");
+const musicActionTextOpacityBorderInput = document.getElementById("music-action-text-opacity-border");
+const musicActionTextOpacityNeonInput = document.getElementById("music-action-text-opacity-neon");
 const musicEmptyState = document.getElementById("music-empty-state");
 const musicAudio = document.getElementById("music-audio");
 
@@ -246,6 +296,7 @@ let musicState = {
     currentPlaylistId: null,
     selectedTrackId: null,
     playingTrackId: null,
+    musicTheme: getDefaultMusicTheme(),
     globalRecordStyle: "classic",
     recordEffect: "none",
     repeatEnabled: false,
@@ -260,6 +311,7 @@ let videoState = {
 };
 let currentWelcomeToolState = getDefaultWelcomeToolState();
 let currentShortcutToolState = getDefaultShortcutToolState();
+let isMusicStyleEditMode = false;
 
 window.onYouTubeIframeAPIReady = function() {
     if (youtubeReadyResolver) youtubeReadyResolver();
@@ -1354,6 +1406,115 @@ function getDefaultShortcutToolState() {
     };
 }
 
+function getDefaultMusicTheme() {
+    return {
+        bar: {
+            fillColor: "#ffffff",
+            borderColor: "#111111",
+            neonColor: "#74d6ff",
+            fillOpacity: 0.9,
+            borderOpacity: 0.48,
+            neonOpacity: 0.22,
+            opacityTargets: { fill: true, border: false, neon: false }
+        },
+        text: {
+            fillColor: "#111111",
+            strokeColor: "#111111",
+            neonColor: "#74d6ff",
+            fillOpacity: 1,
+            strokeOpacity: 0.7,
+            neonOpacity: 0.18,
+            opacityTargets: { fill: true, border: false, neon: false }
+        },
+        now: {
+            fillColor: "#111111",
+            strokeColor: "#111111",
+            neonColor: "#74d6ff",
+            fillOpacity: 1,
+            strokeOpacity: 0.7,
+            neonOpacity: 0.18,
+            opacityTargets: { fill: true, border: false, neon: false }
+        },
+        progress: {
+            fillColor: "#69d2ff",
+            borderColor: "#69d2ff",
+            neonColor: "#69d2ff",
+            fillOpacity: 1,
+            borderOpacity: 0.8,
+            neonOpacity: 0.24,
+            opacityTargets: { fill: true, border: false, neon: false }
+        },
+        record: {
+            neonColor: "#74d6ff",
+            fillOpacity: 1,
+            borderOpacity: 0.04,
+            neonOpacity: 0.32,
+            opacityTargets: { fill: true, border: false, neon: false }
+        },
+        action: {
+            fillColor: "#ffffff",
+            borderColor: "#dddddd",
+            neonColor: "#74d6ff",
+            fillOpacity: 1,
+            borderOpacity: 0.7,
+            neonOpacity: 0.18,
+            textColor: "#333333",
+            textStrokeColor: "#333333",
+            textNeonColor: "#74d6ff",
+            textFillOpacity: 1,
+            textStrokeOpacity: 0.6,
+            textNeonOpacity: 0.18,
+            opacityTargets: { fill: true, border: false, neon: false },
+            textOpacityTargets: { fill: true, border: false, neon: false }
+        }
+    };
+}
+
+function getStoredMusicTheme() {
+    return {
+        ...getDefaultMusicTheme(),
+        ...(musicState.musicTheme || {}),
+        bar: { ...getDefaultMusicTheme().bar, ...(musicState.musicTheme?.bar || {}) },
+        text: { ...getDefaultMusicTheme().text, ...(musicState.musicTheme?.text || {}) },
+        now: { ...getDefaultMusicTheme().now, ...(musicState.musicTheme?.now || {}) },
+        progress: { ...getDefaultMusicTheme().progress, ...(musicState.musicTheme?.progress || {}) },
+        record: { ...getDefaultMusicTheme().record, ...(musicState.musicTheme?.record || {}) },
+        action: { ...getDefaultMusicTheme().action, ...(musicState.musicTheme?.action || {}) }
+    };
+}
+
+function hexToRgbTriplet(hex) {
+    const normalized = String(hex || "#000000").replace("#", "");
+    const value = normalized.length === 3
+        ? normalized.split("").map((char) => char + char).join("")
+        : normalized.padEnd(6, "0").slice(0, 6);
+    const r = parseInt(value.slice(0, 2), 16);
+    const g = parseInt(value.slice(2, 4), 16);
+    const b = parseInt(value.slice(4, 6), 16);
+    return `${r}, ${g}, ${b}`;
+}
+
+function getMusicThemeDisplayOpacity(section) {
+    if (!section) return 1;
+    const targets = section.textOpacityTargets || section.opacityTargets || {};
+    if (targets.fill && typeof section.fillOpacity === "number") return section.fillOpacity;
+    if (targets.border) {
+        if (typeof section.strokeOpacity === "number") return section.strokeOpacity;
+        if (typeof section.borderOpacity === "number") return section.borderOpacity;
+    }
+    if (targets.neon) {
+        if (typeof section.textNeonOpacity === "number") return section.textNeonOpacity;
+        if (typeof section.neonOpacity === "number") return section.neonOpacity;
+    }
+    if (typeof section.fillOpacity === "number") return section.fillOpacity;
+    if (typeof section.textFillOpacity === "number") return section.textFillOpacity;
+    if (typeof section.borderOpacity === "number") return section.borderOpacity;
+    if (typeof section.strokeOpacity === "number") return section.strokeOpacity;
+    if (typeof section.neonOpacity === "number") return section.neonOpacity;
+    if (typeof section.textNeonOpacity === "number") return section.textNeonOpacity;
+    return 1;
+}
+
 function getDefaultMainPageLayout() {
     return {
         logo: { x: 50, y: 24, scale: 100, hidden: false },
@@ -2203,8 +2364,62 @@ function bindMusicEvents() {
     transportToggleBtn.onclick = () => handleTransportToggle();
     repeatToggleBtn.onclick = () => toggleRepeatMode();
     autoplayToggleBtn.onclick = () => toggleAutoplayMode();
+    musicStyleEditBtn.onclick = () => openMusicStyleEditor();
+    musicStyleCloseBtn.onclick = () => closeMusicStyleEditor();
     playbackProgress.addEventListener("input", handlePlaybackScrub);
     playbackProgress.addEventListener("change", applyPlaybackScrub);
+    [
+        musicBarBgColorInput,
+        musicBarBorderColorInput,
+        musicBarNeonColorInput,
+        musicBarOpacityInput,
+        musicTextColorInput,
+        musicTextStrokeColorInput,
+        musicTextNeonColorInput,
+        musicTextOpacityInput,
+        musicNowColorInput,
+        musicNowStrokeColorInput,
+        musicNowNeonColorInput,
+        musicNowOpacityInput,
+        musicProgressColorInput,
+        musicProgressBorderColorInput,
+        musicProgressNeonColorInput,
+        musicProgressOpacityInput,
+        musicRecordNeonColorInput,
+        musicRecordOpacityInput,
+        musicActionBgColorInput,
+        musicActionBorderColorInput,
+        musicActionNeonColorInput,
+        musicActionOpacityInput,
+        musicActionTextColorInput,
+        musicActionTextStrokeColorInput,
+        musicActionTextNeonColorInput,
+        musicActionTextOpacityInput,
+        musicBarOpacityFillInput,
+        musicBarOpacityBorderInput,
+        musicBarOpacityNeonInput,
+        musicTextOpacityFillInput,
+        musicTextOpacityBorderInput,
+        musicTextOpacityNeonInput,
+        musicNowOpacityFillInput,
+        musicNowOpacityBorderInput,
+        musicNowOpacityNeonInput,
+        musicProgressOpacityFillInput,
+        musicProgressOpacityBorderInput,
+        musicProgressOpacityNeonInput,
+        musicRecordOpacityFillInput,
+        musicRecordOpacityBorderInput,
+        musicRecordOpacityNeonInput,
+        musicActionOpacityFillInput,
+        musicActionOpacityBorderInput,
+        musicActionOpacityNeonInput,
+        musicActionTextOpacityFillInput,
+        musicActionTextOpacityBorderInput,
+        musicActionTextOpacityNeonInput
+    ].forEach((input) => {
+        input?.addEventListener("input", handleMusicThemeInput);
+        input?.addEventListener("change", handleMusicThemeInput);
+    });
 
     editPlaylistBtn.onclick = () => openPlaylistEditor();
     closePlaylistEditorBtn.onclick = () => playlistEditorModal.classList.add("hidden");
@@ -2267,6 +2482,16 @@ async function loadMusicState() {
     musicState.currentPlaylistId = savedState.currentPlaylistId || null;
     musicState.selectedTrackId = savedState.selectedTrackId || null;
     musicState.playingTrackId = savedState.playingTrackId || null;
+    musicState.musicTheme = {
+        ...getDefaultMusicTheme(),
+        ...(savedState.musicTheme || {}),
+        bar: { ...getDefaultMusicTheme().bar, ...(savedState.musicTheme?.bar || {}) },
+        text: { ...getDefaultMusicTheme().text, ...(savedState.musicTheme?.text || {}) },
+        now: { ...getDefaultMusicTheme().now, ...(savedState.musicTheme?.now || {}) },
+        progress: { ...getDefaultMusicTheme().progress, ...(savedState.musicTheme?.progress || {}) },
+        record: { ...getDefaultMusicTheme().record, ...(savedState.musicTheme?.record || {}) },
+        action: { ...getDefaultMusicTheme().action, ...(savedState.musicTheme?.action || {}) }
+    };
     musicState.globalRecordStyle = savedState.globalRecordStyle || "classic";
     musicState.recordEffect = savedState.recordEffect || (savedState.rainbowReflectionEnabled ? "rainbow-a" : "none");
     musicState.repeatEnabled = Boolean(savedState.repeatEnabled);
@@ -3482,6 +3707,7 @@ function renderMusicUI() {
     updatePlaybackProgressUi();
     applyRecordAppearance();
     updateRecordStyleButton();
+    applyMusicThemeToPage();
 }
 
 function renderPlaylist() {
@@ -3647,6 +3873,237 @@ function updateRecordStyleButton() {
     recordStyleBtn.disabled = false;
     recordStyleBtn.style.opacity = "1";
     applyRecordAppearance();
+}
+
+function applyMusicThemeToPage() {
+    const theme = getStoredMusicTheme();
+    const musicPage = document.getElementById("music-page");
+    if (!musicPage) return;
+
+    musicPage.style.setProperty("--music-bar-bg", hexToRgbTriplet(theme.bar.fillColor));
+    musicPage.style.setProperty("--music-bar-border", hexToRgbTriplet(theme.bar.borderColor));
+    musicPage.style.setProperty("--music-bar-neon", hexToRgbTriplet(theme.bar.neonColor));
+    musicPage.style.setProperty("--music-bar-opacity", String(theme.bar.fillOpacity));
+    musicPage.style.setProperty("--music-bar-border-opacity", String(theme.bar.borderOpacity));
+    musicPage.style.setProperty("--music-bar-neon-opacity", String(theme.bar.neonOpacity));
+
+    musicPage.style.setProperty("--music-text-color", hexToRgbTriplet(theme.text.fillColor));
+    musicPage.style.setProperty("--music-text-stroke", hexToRgbTriplet(theme.text.strokeColor));
+    musicPage.style.setProperty("--music-text-neon", hexToRgbTriplet(theme.text.neonColor));
+    musicPage.style.setProperty("--music-text-opacity", String(theme.text.fillOpacity));
+    musicPage.style.setProperty("--music-text-stroke-opacity", String(theme.text.strokeOpacity));
+    musicPage.style.setProperty("--music-text-neon-opacity", String(theme.text.neonOpacity));
+
+    musicPage.style.setProperty("--music-now-color", hexToRgbTriplet(theme.now.fillColor));
+    musicPage.style.setProperty("--music-now-stroke", hexToRgbTriplet(theme.now.strokeColor));
+    musicPage.style.setProperty("--music-now-neon", hexToRgbTriplet(theme.now.neonColor));
+    musicPage.style.setProperty("--music-now-opacity", String(theme.now.fillOpacity));
+    musicPage.style.setProperty("--music-now-stroke-opacity", String(theme.now.strokeOpacity));
+    musicPage.style.setProperty("--music-now-neon-opacity", String(theme.now.neonOpacity));
+
+    musicPage.style.setProperty("--music-progress-fill", hexToRgbTriplet(theme.progress.fillColor));
+    musicPage.style.setProperty("--music-progress-border", hexToRgbTriplet(theme.progress.borderColor));
+    musicPage.style.setProperty("--music-progress-neon", hexToRgbTriplet(theme.progress.neonColor));
+    musicPage.style.setProperty("--music-progress-fill-opacity", String(theme.progress.fillOpacity));
+    musicPage.style.setProperty("--music-progress-border-opacity", String(theme.progress.borderOpacity));
+    musicPage.style.setProperty("--music-progress-neon-opacity", String(theme.progress.neonOpacity));
+
+    musicPage.style.setProperty("--music-record-neon", hexToRgbTriplet(theme.record.neonColor));
+    musicPage.style.setProperty("--music-record-opacity", String(theme.record.fillOpacity));
+    musicPage.style.setProperty("--music-record-border-opacity", String(theme.record.borderOpacity));
+    musicPage.style.setProperty("--music-record-neon-opacity", String(theme.record.neonOpacity));
+
+    musicPage.style.setProperty("--music-action-bg", hexToRgbTriplet(theme.action.fillColor));
+    musicPage.style.setProperty("--music-action-border", hexToRgbTriplet(theme.action.borderColor));
+    musicPage.style.setProperty("--music-action-neon", hexToRgbTriplet(theme.action.neonColor));
+    musicPage.style.setProperty("--music-action-opacity", String(theme.action.fillOpacity));
+    musicPage.style.setProperty("--music-action-border-opacity", String(theme.action.borderOpacity));
+    musicPage.style.setProperty("--music-action-neon-opacity", String(theme.action.neonOpacity));
+    musicPage.style.setProperty("--music-action-text-color", hexToRgbTriplet(theme.action.textColor));
+    musicPage.style.setProperty("--music-action-text-stroke", hexToRgbTriplet(theme.action.textStrokeColor));
+    musicPage.style.setProperty("--music-action-text-neon", hexToRgbTriplet(theme.action.textNeonColor));
+    musicPage.style.setProperty("--music-action-text-opacity", String(theme.action.textFillOpacity));
+    musicPage.style.setProperty("--music-action-text-stroke-opacity", String(theme.action.textStrokeOpacity));
+    musicPage.style.setProperty("--music-action-text-neon-opacity", String(theme.action.textNeonOpacity));
+}
+
+function syncMusicThemeInputs() {
+    const theme = getStoredMusicTheme();
+    musicBarBgColorInput.value = theme.bar.fillColor;
+    musicBarBorderColorInput.value = theme.bar.borderColor;
+    musicBarNeonColorInput.value = theme.bar.neonColor;
+    musicBarOpacityFillInput.checked = Boolean(theme.bar.opacityTargets?.fill);
+    musicBarOpacityBorderInput.checked = Boolean(theme.bar.opacityTargets?.border);
+    musicBarOpacityNeonInput.checked = Boolean(theme.bar.opacityTargets?.neon);
+    musicBarOpacityInput.value = String(getMusicThemeDisplayOpacity(theme.bar));
+    musicTextColorInput.value = theme.text.fillColor;
+    musicTextStrokeColorInput.value = theme.text.strokeColor;
+    musicTextNeonColorInput.value = theme.text.neonColor;
+    musicTextOpacityFillInput.checked = Boolean(theme.text.opacityTargets?.fill);
+    musicTextOpacityBorderInput.checked = Boolean(theme.text.opacityTargets?.border);
+    musicTextOpacityNeonInput.checked = Boolean(theme.text.opacityTargets?.neon);
+    musicTextOpacityInput.value = String(getMusicThemeDisplayOpacity(theme.text));
+    musicNowColorInput.value = theme.now.fillColor;
+    musicNowStrokeColorInput.value = theme.now.strokeColor;
+    musicNowNeonColorInput.value = theme.now.neonColor;
+    musicNowOpacityFillInput.checked = Boolean(theme.now.opacityTargets?.fill);
+    musicNowOpacityBorderInput.checked = Boolean(theme.now.opacityTargets?.border);
+    musicNowOpacityNeonInput.checked = Boolean(theme.now.opacityTargets?.neon);
+    musicNowOpacityInput.value = String(getMusicThemeDisplayOpacity(theme.now));
+    musicProgressColorInput.value = theme.progress.fillColor;
+    musicProgressBorderColorInput.value = theme.progress.borderColor;
+    musicProgressNeonColorInput.value = theme.progress.neonColor;
+    musicProgressOpacityFillInput.checked = Boolean(theme.progress.opacityTargets?.fill);
+    musicProgressOpacityBorderInput.checked = Boolean(theme.progress.opacityTargets?.border);
+    musicProgressOpacityNeonInput.checked = Boolean(theme.progress.opacityTargets?.neon);
+    musicProgressOpacityInput.value = String(getMusicThemeDisplayOpacity(theme.progress));
+    musicRecordNeonColorInput.value = theme.record.neonColor;
+    musicRecordOpacityFillInput.checked = Boolean(theme.record.opacityTargets?.fill);
+    musicRecordOpacityBorderInput.checked = Boolean(theme.record.opacityTargets?.border);
+    musicRecordOpacityNeonInput.checked = Boolean(theme.record.opacityTargets?.neon);
+    musicRecordOpacityInput.value = String(getMusicThemeDisplayOpacity(theme.record));
+    musicActionBgColorInput.value = theme.action.fillColor;
+    musicActionBorderColorInput.value = theme.action.borderColor;
+    musicActionNeonColorInput.value = theme.action.neonColor;
+    musicActionOpacityFillInput.checked = Boolean(theme.action.opacityTargets?.fill);
+    musicActionOpacityBorderInput.checked = Boolean(theme.action.opacityTargets?.border);
+    musicActionOpacityNeonInput.checked = Boolean(theme.action.opacityTargets?.neon);
+    musicActionOpacityInput.value = String(getMusicThemeDisplayOpacity(theme.action));
+    musicActionTextColorInput.value = theme.action.textColor;
+    musicActionTextStrokeColorInput.value = theme.action.textStrokeColor;
+    musicActionTextNeonColorInput.value = theme.action.textNeonColor;
+    musicActionTextOpacityFillInput.checked = Boolean(theme.action.textOpacityTargets?.fill);
+    musicActionTextOpacityBorderInput.checked = Boolean(theme.action.textOpacityTargets?.border);
+    musicActionTextOpacityNeonInput.checked = Boolean(theme.action.textOpacityTargets?.neon);
+    musicActionTextOpacityInput.value = String(getMusicThemeDisplayOpacity({
+        fillOpacity: theme.action.textFillOpacity,
+        strokeOpacity: theme.action.textStrokeOpacity,
+        neonOpacity: theme.action.textNeonOpacity,
+        opacityTargets: theme.action.textOpacityTargets
+    }));
+}
+
+function openMusicStyleEditor() {
+    isMusicStyleEditMode = true;
+    musicStylePanel.classList.remove("hidden");
+    musicStyleCloseBtn.classList.remove("hidden");
+    syncMusicThemeInputs();
+}
+
+function closeMusicStyleEditor() {
+    isMusicStyleEditMode = false;
+    musicStylePanel.classList.add("hidden");
+    musicStyleCloseBtn.classList.add("hidden");
+}
+
+function handleMusicThemeInput() {
+    const defaults = getDefaultMusicTheme();
+    const barOpacityTargets = {
+        fill: musicBarOpacityFillInput.checked,
+        border: musicBarOpacityBorderInput.checked,
+        neon: musicBarOpacityNeonInput.checked
+    };
+    const textOpacityTargets = {
+        fill: musicTextOpacityFillInput.checked,
+        border: musicTextOpacityBorderInput.checked,
+        neon: musicTextOpacityNeonInput.checked
+    };
+    const nowOpacityTargets = {
+        fill: musicNowOpacityFillInput.checked,
+        border: musicNowOpacityBorderInput.checked,
+        neon: musicNowOpacityNeonInput.checked
+    };
+    const progressOpacityTargets = {
+        fill: musicProgressOpacityFillInput.checked,
+        border: musicProgressOpacityBorderInput.checked,
+        neon: musicProgressOpacityNeonInput.checked
+    };
+    const recordOpacityTargets = {
+        fill: musicRecordOpacityFillInput.checked,
+        border: musicRecordOpacityBorderInput.checked,
+        neon: musicRecordOpacityNeonInput.checked
+    };
+    const actionOpacityTargets = {
+        fill: musicActionOpacityFillInput.checked,
+        border: musicActionOpacityBorderInput.checked,
+        neon: musicActionOpacityNeonInput.checked
+    };
+    const actionTextOpacityTargets = {
+        fill: musicActionTextOpacityFillInput.checked,
+        border: musicActionTextOpacityBorderInput.checked,
+        neon: musicActionTextOpacityNeonInput.checked
+    };
+
+    musicState.musicTheme = {
+        ...getStoredMusicTheme(),
+        bar: {
+            ...getStoredMusicTheme().bar,
+            fillColor: musicBarBgColorInput.value,
+            borderColor: musicBarBorderColorInput.value,
+            neonColor: musicBarNeonColorInput.value,
+            fillOpacity: barOpacityTargets.fill ? Number(musicBarOpacityInput.value) : defaults.bar.fillOpacity,
+            borderOpacity: barOpacityTargets.border ? Number(musicBarOpacityInput.value) : defaults.bar.borderOpacity,
+            neonOpacity: barOpacityTargets.neon ? Number(musicBarOpacityInput.value) : defaults.bar.neonOpacity,
+            opacityTargets: barOpacityTargets
+        },
+        text: {
+            ...getStoredMusicTheme().text,
+            fillColor: musicTextColorInput.value,
+            strokeColor: musicTextStrokeColorInput.value,
+            neonColor: musicTextNeonColorInput.value,
+            fillOpacity: textOpacityTargets.fill ? Number(musicTextOpacityInput.value) : defaults.text.fillOpacity,
+            strokeOpacity: textOpacityTargets.border ? Number(musicTextOpacityInput.value) : defaults.text.strokeOpacity,
+            neonOpacity: textOpacityTargets.neon ? Number(musicTextOpacityInput.value) : defaults.text.neonOpacity,
+            opacityTargets: textOpacityTargets
+        },
+        now: {
+            ...getStoredMusicTheme().now,
+            fillColor: musicNowColorInput.value,
+            strokeColor: musicNowStrokeColorInput.value,
+            neonColor: musicNowNeonColorInput.value,
+            fillOpacity: nowOpacityTargets.fill ? Number(musicNowOpacityInput.value) : defaults.now.fillOpacity,
+            strokeOpacity: nowOpacityTargets.border ? Number(musicNowOpacityInput.value) : defaults.now.strokeOpacity,
+            neonOpacity: nowOpacityTargets.neon ? Number(musicNowOpacityInput.value) : defaults.now.neonOpacity,
+            opacityTargets: nowOpacityTargets
+        },
+        progress: {
+            ...getStoredMusicTheme().progress,
+            fillColor: musicProgressColorInput.value,
+            borderColor: musicProgressBorderColorInput.value,
+            neonColor: musicProgressNeonColorInput.value,
+            fillOpacity: progressOpacityTargets.fill ? Number(musicProgressOpacityInput.value) : defaults.progress.fillOpacity,
+            borderOpacity: progressOpacityTargets.border ? Number(musicProgressOpacityInput.value) : defaults.progress.borderOpacity,
+            neonOpacity: progressOpacityTargets.neon ? Number(musicProgressOpacityInput.value) : defaults.progress.neonOpacity,
+            opacityTargets: progressOpacityTargets
+        },
+        record: {
+            ...getStoredMusicTheme().record,
+            neonColor: musicRecordNeonColorInput.value,
+            fillOpacity: recordOpacityTargets.fill ? Number(musicRecordOpacityInput.value) : defaults.record.fillOpacity,
+            borderOpacity: recordOpacityTargets.border ? Number(musicRecordOpacityInput.value) : defaults.record.borderOpacity,
+            neonOpacity: recordOpacityTargets.neon ? Number(musicRecordOpacityInput.value) : defaults.record.neonOpacity,
+            opacityTargets: recordOpacityTargets
+        },
+        action: {
+            ...getStoredMusicTheme().action,
+            fillColor: musicActionBgColorInput.value,
+            borderColor: musicActionBorderColorInput.value,
+            neonColor: musicActionNeonColorInput.value,
+            fillOpacity: actionOpacityTargets.fill ? Number(musicActionOpacityInput.value) : defaults.action.fillOpacity,
+            borderOpacity: actionOpacityTargets.border ? Number(musicActionOpacityInput.value) : defaults.action.borderOpacity,
+            neonOpacity: actionOpacityTargets.neon ? Number(musicActionOpacityInput.value) : defaults.action.neonOpacity,
+            opacityTargets: actionOpacityTargets,
+            textColor: musicActionTextColorInput.value,
+            textStrokeColor: musicActionTextStrokeColorInput.value,
+            textNeonColor: musicActionTextNeonColorInput.value,
+            textFillOpacity: actionTextOpacityTargets.fill ? Number(musicActionTextOpacityInput.value) : defaults.action.textFillOpacity,
+            textStrokeOpacity: actionTextOpacityTargets.border ? Number(musicActionTextOpacityInput.value) : defaults.action.textStrokeOpacity,
+            textNeonOpacity: actionTextOpacityTargets.neon ? Number(musicActionTextOpacityInput.value) : defaults.action.textNeonOpacity,
+            textOpacityTargets: actionTextOpacityTargets
+        }
+    };
+    saveMusicState();
+    applyMusicThemeToPage();
 }
 
 function openRecordStyleModal() {

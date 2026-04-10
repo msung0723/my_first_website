@@ -463,6 +463,91 @@
                 <div class="music-empty hidden" id="music-empty-state">업로드한 노래가 아직 없습니다</div>
             </div>
         </div>
+        <div class="music-edit-controls">
+            <button id="music-style-edit-btn" class="nav-btn" type="button">음악 탭 수정</button>
+            <button id="music-style-close-btn" class="nav-btn gray hidden" type="button">수정 종료</button>
+        </div>
+        <div id="music-style-panel" class="music-style-panel hidden">
+            <div class="music-style-section">
+                <h3>재생 바</h3>
+                <label><span>배경색</span><input id="music-bar-bg-color" type="color" value="#ffffff"></label>
+                <label><span>테두리색</span><input id="music-bar-border-color" type="color" value="#111111"></label>
+                <label><span>네온색</span><input id="music-bar-neon-color" type="color" value="#74d6ff"></label>
+                <label><span>투명도</span><input id="music-bar-opacity" type="range" min="0.2" max="1" step="0.01" value="0.9"></label>
+                <div class="music-opacity-targets">
+                    <label><input id="music-bar-opacity-fill" type="checkbox" checked> 안쪽</label>
+                    <label><input id="music-bar-opacity-border" type="checkbox"> 테두리</label>
+                    <label><input id="music-bar-opacity-neon" type="checkbox"> 네온</label>
+                </div>
+            </div>
+            <div class="music-style-section">
+                <h3>글자 / 아이콘</h3>
+                <label><span>색상</span><input id="music-text-color" type="color" value="#111111"></label>
+                <label><span>테두리색</span><input id="music-text-stroke-color" type="color" value="#111111"></label>
+                <label><span>네온색</span><input id="music-text-neon-color" type="color" value="#74d6ff"></label>
+                <label><span>투명도</span><input id="music-text-opacity" type="range" min="0.2" max="1" step="0.01" value="1"></label>
+                <div class="music-opacity-targets">
+                    <label><input id="music-text-opacity-fill" type="checkbox" checked> 안쪽</label>
+                    <label><input id="music-text-opacity-border" type="checkbox"> 테두리</label>
+                    <label><input id="music-text-opacity-neon" type="checkbox"> 네온</label>
+                </div>
+            </div>
+            <div class="music-style-section">
+                <h3>Now Playing / 현재 재생</h3>
+                <label><span>색상</span><input id="music-now-color" type="color" value="#111111"></label>
+                <label><span>테두리색</span><input id="music-now-stroke-color" type="color" value="#111111"></label>
+                <label><span>네온색</span><input id="music-now-neon-color" type="color" value="#74d6ff"></label>
+                <label><span>투명도</span><input id="music-now-opacity" type="range" min="0.2" max="1" step="0.01" value="1"></label>
+                <div class="music-opacity-targets">
+                    <label><input id="music-now-opacity-fill" type="checkbox" checked> 안쪽</label>
+                    <label><input id="music-now-opacity-border" type="checkbox"> 테두리</label>
+                    <label><input id="music-now-opacity-neon" type="checkbox"> 네온</label>
+                </div>
+            </div>
+            <div class="music-style-section">
+                <h3>재생 진행 바</h3>
+                <label><span>색상</span><input id="music-progress-color" type="color" value="#69d2ff"></label>
+                <label><span>테두리색</span><input id="music-progress-border-color" type="color" value="#69d2ff"></label>
+                <label><span>네온색</span><input id="music-progress-neon-color" type="color" value="#69d2ff"></label>
+                <label><span>투명도</span><input id="music-progress-opacity" type="range" min="0.2" max="1" step="0.01" value="1"></label>
+                <div class="music-opacity-targets">
+                    <label><input id="music-progress-opacity-fill" type="checkbox" checked> 안쪽</label>
+                    <label><input id="music-progress-opacity-border" type="checkbox"> 테두리</label>
+                    <label><input id="music-progress-opacity-neon" type="checkbox"> 네온</label>
+                </div>
+            </div>
+            <div class="music-style-section">
+                <h3>음반</h3>
+                <label><span>테두리 네온색</span><input id="music-record-neon-color" type="color" value="#74d6ff"></label>
+                <label><span>투명도</span><input id="music-record-opacity" type="range" min="0.3" max="1" step="0.01" value="1"></label>
+                <div class="music-opacity-targets">
+                    <label><input id="music-record-opacity-fill" type="checkbox" checked> 안쪽</label>
+                    <label><input id="music-record-opacity-border" type="checkbox"> 테두리</label>
+                    <label><input id="music-record-opacity-neon" type="checkbox"> 네온</label>
+                </div>
+            </div>
+            <div class="music-style-section">
+                <h3>오른쪽 버튼들</h3>
+                <label><span>배경색</span><input id="music-action-bg-color" type="color" value="#ffffff"></label>
+                <label><span>테두리색</span><input id="music-action-border-color" type="color" value="#dddddd"></label>
+                <label><span>네온색</span><input id="music-action-neon-color" type="color" value="#74d6ff"></label>
+                <label><span>버튼 투명도</span><input id="music-action-opacity" type="range" min="0.2" max="1" step="0.01" value="1"></label>
+                <div class="music-opacity-targets">
+                    <label><input id="music-action-opacity-fill" type="checkbox" checked> 안쪽</label>
+                    <label><input id="music-action-opacity-border" type="checkbox"> 테두리</label>
+                    <label><input id="music-action-opacity-neon" type="checkbox"> 네온</label>
+                </div>
+                <label><span>글자색</span><input id="music-action-text-color" type="color" value="#333333"></label>
+                <label><span>글자 테두리색</span><input id="music-action-text-stroke-color" type="color" value="#333333"></label>
+                <label><span>글자 네온색</span><input id="music-action-text-neon-color" type="color" value="#74d6ff"></label>
+                <label><span>글자 투명도</span><input id="music-action-text-opacity" type="range" min="0.2" max="1" step="0.01" value="1"></label>
+                <div class="music-opacity-targets">
+                    <label><input id="music-action-text-opacity-fill" type="checkbox" checked> 안쪽</label>
+                    <label><input id="music-action-text-opacity-border" type="checkbox"> 테두리</label>
+                    <label><input id="music-action-text-opacity-neon" type="checkbox"> 네온</label>
+                </div>
+            </div>
+        </div>
 
         <audio id="music-audio" preload="metadata"></audio>
         <div id="youtube-player-host" class="hidden">

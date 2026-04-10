@@ -2647,6 +2647,7 @@ function saveMusicState() {
             currentPlaylistId: musicState.currentPlaylistId,
             selectedTrackId: musicState.selectedTrackId,
             playingTrackId: musicState.playingTrackId,
+            musicTheme: musicState.musicTheme,
             globalRecordStyle: musicState.globalRecordStyle,
             recordEffect: musicState.recordEffect,
             repeatEnabled: musicState.repeatEnabled,

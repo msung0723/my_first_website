@@ -4799,6 +4799,178 @@ function renderLibraryPicker() {
     });
 }
 
+async function saveMusicTrack() {
+    const playlist = getCurrentPlaylist();
+    if (!playlist) return;
+
+    const customTitle = musicTitleInput.value.trim();
+
+    if (musicAddSourceType === "youtube") {
+        const youtubeUrl = youtubeLinkInput.value.trim();
+        const youtubeId = extractYouTubeId(youtubeUrl);
+        if (!youtubeId) {
+            alert("?щ컮瑜??좏뒠釉?留곹겕瑜??낅젰?댁＜?몄슂.");
+            return;
+        }
+
+        const resolvedTitle = customTitle || await fetchYouTubeVideoTitle(youtubeUrl) || "유튜브 음악";
+        const trackId = createId("track");
+        musicState.library.push(normalizeTrackData({
+            id: trackId,
+            name: resolvedTitle,
+            sourceType: "youtube",
+            youtubeId,
+            youtubeUrl
+        }));
+        playlist.trackIds.push(trackId);
+    } else {
+        const file = musicFileInput.files[0];
+        if (!file) {
+            alert("추가할 mp3 파일을 선택해 주세요.");
+            return;
+        }
+
+        const trackId = createId("track");
+        await saveTrackBlob(trackId, file);
+        musicState.library.push(normalizeTrackData({
+            id: trackId,
+            name: customTitle || file.name.replace(/\.[^.]+$/, "") || file.name,
+            originalName: file.name,
+            sourceType: "file"
+        }));
+        playlist.trackIds.push(trackId);
+    }
+
+    normalizeSelectedTrack();
+    saveMusicState();
+    renderMusicUI();
+    openPlaylistEditorIfVisible();
+    renderLibraryPickerIfVisible();
+    musicAddModal.classList.add("hidden");
+}
+
+function renameTrackInLibrary(trackId) {
+    const track = getTrackById(trackId);
+    if (!track) return;
+
+    const nextName = prompt("노래 이름을 수정해 주세요.", track.name || "");
+    if (nextName === null) return;
+
+    const trimmed = nextName.trim();
+    if (!trimmed) {
+        alert("노래 이름은 비워둘 수 없습니다.");
+        return;
+    }
+
+    track.name = trimmed;
+    saveMusicState();
+    renderMusicUI();
+    openPlaylistEditorIfVisible();
+    renderLibraryPickerIfVisible();
+}
+
+function renderLibraryPicker() {
+    const playlist = getCurrentPlaylist();
+    const activeVisualTrack = getTrackForMusicVisuals();
+    const activeTrackId = activeVisualTrack?.id || null;
+    libraryPickerList.innerHTML = "";
+
+    if (!musicState.library.length) {
+        const empty = document.createElement("div");
+        empty.className = "playlist-edit-subtitle";
+        empty.textContent = "보관함에 추가된 노래가 아직 없습니다.";
+        libraryPickerList.appendChild(empty);
+        return;
+    }
+
+    musicState.library.forEach((track) => {
+        const row = document.createElement("div");
+        row.className = "library-picker-item";
+
+        const recordStatus = track.customRecordArt
+            ? (activeTrackId === track.id ? "현재 음반 이미지 사용 중" : "음반 이미지 설정됨")
+            : "음반 이미지 없음";
+        const backgroundStatus = track.customBackgroundArt
+            ? (activeTrackId === track.id ? "현재 배경 사용 중" : "배경 이미지 설정됨")
+            : "배경 이미지 없음";
+
+        const meta = document.createElement("div");
+        meta.className = "playlist-edit-meta";
+        meta.innerHTML = `
+            <div class="playlist-edit-title">${track.name}</div>
+            <div class="library-picker-type">${track.sourceType === "youtube" ? "유튜브 링크" : "mp3 파일"}</div>
+            <div class="playlist-edit-subtitle">${recordStatus}</div>
+            <div class="playlist-edit-subtitle">${backgroundStatus}</div>
+        `;
+
+        const actions = document.createElement("div");
+        actions.className = "library-picker-actions";
+
+        const renameBtn = document.createElement("button");
+        renameBtn.type = "button";
+        renameBtn.className = "mini-btn";
+        renameBtn.title = "노래 이름 수정";
+        renameBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
+        renameBtn.onclick = () => renameTrackInLibrary(track.id);
+
+        const rotateBtn = document.createElement("button");
+        rotateBtn.type = "button";
+        rotateBtn.className = "mini-btn";
+        rotateBtn.title = "음반 회전 켜기 또는 끄기";
+        rotateBtn.innerHTML = `<i class="fa-solid ${track.rotateRecord === false ? "fa-circle-stop" : "fa-rotate"}"></i>`;
+        rotateBtn.onclick = () => toggleTrackRotation(track.id);
+
+        const artBtn = document.createElement("button");
+        artBtn.type = "button";
+        artBtn.className = "mini-btn";
+        artBtn.title = "곡 전용 음반 이미지 설정";
+        artBtn.innerHTML = '<i class="fa-solid fa-compact-disc"></i>';
+        artBtn.onclick = () => requestTrackArtUpload(track.id);
+
+        const clearArtBtn = document.createElement("button");
+        clearArtBtn.type = "button";
+        clearArtBtn.className = "mini-btn";
+        clearArtBtn.title = "음반 이미지 삭제";
+        clearArtBtn.innerHTML = '<i class="fa-solid fa-eraser"></i>';
+        clearArtBtn.disabled = !track.customRecordArt;
+        clearArtBtn.onclick = () => clearTrackRecordArt(track.id);
+
+        const backgroundBtn = document.createElement("button");
+        backgroundBtn.type = "button";
+        backgroundBtn.className = "mini-btn";
+        backgroundBtn.title = "곡 전용 배경 이미지 설정";
+        backgroundBtn.innerHTML = '<i class="fa-solid fa-image"></i>';
+        backgroundBtn.onclick = () => requestTrackBackgroundUpload(track.id);
+
+        const clearBackgroundBtn = document.createElement("button");
+        clearBackgroundBtn.type = "button";
+        clearBackgroundBtn.className = "mini-btn";
+        clearBackgroundBtn.title = "배경 이미지 삭제";
+        clearBackgroundBtn.innerHTML = '<i class="fa-solid fa-trash-can-arrow-up"></i>';
+        clearBackgroundBtn.disabled = !track.customBackgroundArt;
+        clearBackgroundBtn.onclick = () => clearTrackBackgroundArt(track.id);
+
+        const addBtn = document.createElement("button");
+        addBtn.type = "button";
+        addBtn.className = "nav-btn";
+        const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
+        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
+        addBtn.disabled = alreadyAdded;
+        addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "mini-btn";
+        deleteBtn.title = "보관함에서 영구 삭제";
+        deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+        deleteBtn.onclick = () => deleteTrackFromLibrary(track.id);
+
+        actions.append(renameBtn, rotateBtn, artBtn, clearArtBtn, backgroundBtn, clearBackgroundBtn, addBtn, deleteBtn);
+        row.append(meta, actions);
+        libraryPickerList.appendChild(row);
+    });
+}
+
 function getVideoLibraryKeyForUser(userId) {
     return userId ? `${VIDEO_LIBRARY_KEY_PREFIX}:${userId}` : null;
 }

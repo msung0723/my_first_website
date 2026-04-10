@@ -236,6 +236,7 @@ const miniVideoPlayer = document.getElementById("mini-video-player");
 const miniVideoTitle = document.getElementById("mini-video-title");
 const miniVideoOpenBtn = document.getElementById("mini-video-open-btn");
 const miniVideoCloseBtn = document.getElementById("mini-video-close-btn");
+const miniVideoResizeHandle = document.getElementById("mini-video-resize-handle");
 
 const youtubePlayerHost = document.getElementById("youtube-player-host");
 
@@ -274,6 +275,7 @@ let playlistAnimationTimer = null;
 let lastRenderedPlaylistIndex = null;
 let videoFrameResizeObserver = null;
 let activeDragState = null;
+let activeMiniVideoResize = null;
 let guestVideos = [];
 let profileCropDraft = null;
 let profileCropDragState = null;
@@ -346,6 +348,7 @@ window.onload = async function() {
     await initMusicPage();
     initVideoPage();
     initDraggablePanels();
+    initMiniVideoResizeHandle();
 };
 
 function bindCoreEvents() {
@@ -4406,6 +4409,9 @@ function initDraggablePanels() {
 
             panel.style.left = `${boundedLeft + panel.offsetWidth / 2}px`;
             panel.style.top = `${boundedTop + panel.offsetHeight / 2}px`;
+            if (panel === miniVideoPlayer) {
+                refreshVideoFrameLayout();
+            }
         });
 
         const stopDragging = () => {
@@ -4417,6 +4423,43 @@ function initDraggablePanels() {
         handle.addEventListener("pointerup", stopDragging);
         handle.addEventListener("pointercancel", stopDragging);
     });
+}
+
+function initMiniVideoResizeHandle() {
+    if (!miniVideoResizeHandle || !miniVideoPlayer) return;
+
+    miniVideoResizeHandle.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const rect = miniVideoPlayer.getBoundingClientRect();
+        activeMiniVideoResize = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            startWidth: rect.width,
+            startHeight: rect.height
+        };
+
+        miniVideoResizeHandle.setPointerCapture(event.pointerId);
+    });
+
+    miniVideoResizeHandle.addEventListener("pointermove", (event) => {
+        if (!activeMiniVideoResize || activeMiniVideoResize.pointerId !== event.pointerId) return;
+
+        const nextWidth = Math.max(260, activeMiniVideoResize.startWidth + (event.clientX - activeMiniVideoResize.startX));
+        const nextHeight = Math.max(180, activeMiniVideoResize.startHeight + (event.clientY - activeMiniVideoResize.startY));
+        miniVideoPlayer.style.width = `${nextWidth}px`;
+        miniVideoPlayer.style.height = `${nextHeight}px`;
+        refreshVideoFrameLayout();
+    });
+
+    const stopResize = () => {
+        activeMiniVideoResize = null;
+    };
+
+    miniVideoResizeHandle.addEventListener("pointerup", stopResize);
+    miniVideoResizeHandle.addEventListener("pointercancel", stopResize);
 }
 
 function requestTrackArtUpload(trackId) {

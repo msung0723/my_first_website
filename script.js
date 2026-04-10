@@ -59,6 +59,7 @@ const resetBackgroundImageBtn = document.getElementById("reset-background-image"
 const backgroundImageInput = document.getElementById("background-image-input");
 const backgroundImageLibrary = document.getElementById("background-image-library");
 const applyHeaderWallpaperInput = document.getElementById("apply-header-wallpaper");
+const musicBackgroundOpacityInput = document.getElementById("music-background-opacity");
 const mainLogoWrap = document.getElementById("main-logo-wrap");
 const mainCenterLogo = document.getElementById("main-center-logo");
 const logoNeonHoverPanel = document.getElementById("logo-neon-hover-panel");
@@ -363,6 +364,9 @@ function bindCoreEvents() {
             : (getCurrentUser()?.backgroundImage || "");
         applySiteWallpaper(wallpaper, applyHeaderWallpaperInput.checked);
     };
+    musicBackgroundOpacityInput.oninput = () => {
+        applyMusicBackgroundOpacity(Number(musicBackgroundOpacityInput.value || 100) / 100);
+    };
     navVolumeBtn.onclick = (event) => {
         event.stopPropagation();
         headerVolumePanel.classList.toggle("hidden");
@@ -555,6 +559,9 @@ function loadSettings() {
     const logoNeonColor = currentUser?.logoNeonColor || "";
     const cursorStyle = currentUser?.cursorStyle || "default";
     const showShortcuts = currentUser?.showShortcuts !== false;
+    const musicBackgroundOpacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
+        ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
+        : 1;
     const welcomeMessage = currentUser?.welcomeMessage || (currentUser ? `${currentUser.id}님 환영합니다` : "아무개님 환영합니다");
 
     if (currentUser) {
@@ -581,10 +588,12 @@ function loadSettings() {
     logoNeonHoverColorInput.value = logoNeonColor || "#62e7ff";
     cursorStyleSelect.value = cursorStyle;
     showShortcutsToggle.checked = showShortcuts;
+    musicBackgroundOpacityInput.value = String(Math.round(musicBackgroundOpacity * 100));
     pendingBackgroundImage = null;
     pendingBackgroundReset = false;
     applyBorderEffect(isRainbow, savedColor);
     applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+    applyMusicBackgroundOpacity(musicBackgroundOpacity);
     applyCursorStyle(cursorStyle);
     applyLogoNeonColor(logoNeonColor);
     renderWelcomeMessage(currentUser);
@@ -688,6 +697,11 @@ function applySiteWallpaper(imageData, applyToHeader) {
     pageHeader.style.setProperty("background-position", "center", "important");
     pageHeader.style.setProperty("background-size", "cover", "important");
     pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+}
+
+function applyMusicBackgroundOpacity(opacityValue) {
+    const nextOpacity = Number.isFinite(opacityValue) ? Math.min(1, Math.max(0, opacityValue)) : 1;
+    document.documentElement.style.setProperty("--music-track-bg-opacity", String(nextOpacity));
 }
 
 function applyLogoNeonColor(color) {
@@ -2161,6 +2175,7 @@ function handleSignup() {
         logoNeonColor: "",
         cursorStyle: "default",
         showShortcuts: true,
+        musicBackgroundOpacity: 1,
         profileImageHistory: [],
         backgroundImageHistory: [],
         mainPagePresets: [null, null, null],
@@ -2383,6 +2398,7 @@ async function saveProfileSettings() {
         users[currentIndex].logoNeonColor = logoNeonHoverColorInput.value;
         users[currentIndex].cursorStyle = cursorStyleSelect.value;
         users[currentIndex].showShortcuts = showShortcutsToggle.checked;
+        users[currentIndex].musicBackgroundOpacity = Math.min(1, Math.max(0, Number(musicBackgroundOpacityInput.value || 100) / 100));
         if (pendingBackgroundReset) {
             users[currentIndex].backgroundImage = "";
         } else if (pendingBackgroundImage !== null) {
@@ -2605,6 +2621,7 @@ function migrateLegacyUserData() {
         logoNeonColor: "#62e7ff",
         cursorStyle: "default",
         showShortcuts: true,
+        musicBackgroundOpacity: 1,
         profileImageHistory: [],
         backgroundImageHistory: [],
         mainPagePresets: [null, null, null],

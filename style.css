@@ -765,6 +765,7 @@ body.has-custom-wallpaper #music-page::before {
     --music-action-text-neon-opacity: 0.18;
     --music-track-bg-overlay: 0;
     --music-track-bg-url: none;
+    --music-track-bg-opacity: 1;
 }
 
 #video-page {
@@ -1158,6 +1159,7 @@ body.has-custom-wallpaper #music-page::before {
 }
 
 #music-page.has-track-background::before {
+    opacity: var(--music-track-bg-opacity);
     background-image: var(--music-track-bg-url);
     background-size: cover;
     background-position: center;

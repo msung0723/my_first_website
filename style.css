@@ -1376,7 +1376,7 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
     border: none;
     cursor: pointer;
     background: transparent;
-    opacity: calc(var(--music-record-opacity) * var(--music-record-disc-opacity));
+    opacity: var(--music-record-opacity);
     box-shadow:
         0 0 0 2px rgba(var(--music-record-border), var(--music-record-border-opacity)),
         0 0 24px rgba(var(--music-record-neon), var(--music-record-neon-opacity)),

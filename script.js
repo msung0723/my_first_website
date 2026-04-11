@@ -759,8 +759,7 @@ function applyMusicBackgroundOpacity(opacityValue) {
 
 function applyRecordDiscOpacity(value) {
     const v = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 1;
-    document.documentElement.style.setProperty("--music-record-disc-opacity", String(v));
-    document.getElementById("music-page")?.style.setProperty("--music-record-disc-opacity", String(v));
+    if (recordDisc) recordDisc.style.opacity = String(v);
 }
 
 function applyLogoNeonColor(color) {

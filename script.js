@@ -61,6 +61,7 @@ const backgroundImageLibrary = document.getElementById("background-image-library
 const applyHeaderWallpaperInput = document.getElementById("apply-header-wallpaper");
 const applyMusicHeaderWallpaperInput = document.getElementById("apply-music-header-wallpaper");
 const musicBackgroundOpacityInput = document.getElementById("music-background-opacity");
+const recordDiscOpacityInput = document.getElementById("record-disc-opacity");
 const mainLogoWrap = document.getElementById("main-logo-wrap");
 const mainCenterLogo = document.getElementById("main-center-logo");
 const logoNeonHoverPanel = document.getElementById("logo-neon-hover-panel");
@@ -406,6 +407,11 @@ function bindCoreEvents() {
     musicBackgroundOpacityInput.oninput = () => {
         applyMusicBackgroundOpacity(Number(musicBackgroundOpacityInput.value || 100) / 100);
     };
+    if (recordDiscOpacityInput) {
+        recordDiscOpacityInput.oninput = () => {
+            applyRecordDiscOpacity(Number(recordDiscOpacityInput.value || 100) / 100);
+        };
+    }
     navVolumeBtn.onclick = (event) => {
         event.stopPropagation();
         headerVolumePanel.classList.toggle("hidden");
@@ -630,11 +636,16 @@ function loadSettings() {
     showShortcutsToggle.checked = showShortcuts;
     applyMusicHeaderWallpaperInput.checked = applyMusicHeaderWallpaper;
     musicBackgroundOpacityInput.value = String(Math.round(musicBackgroundOpacity * 100));
+    const recordDiscOpacity = Number.isFinite(currentUser?.recordDiscOpacity)
+        ? Math.min(1, Math.max(0, currentUser.recordDiscOpacity))
+        : 1;
+    if (recordDiscOpacityInput) recordDiscOpacityInput.value = String(Math.round(recordDiscOpacity * 100));
     pendingBackgroundImage = null;
     pendingBackgroundReset = false;
     applyBorderEffect(isRainbow, savedColor);
     applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
     applyMusicBackgroundOpacity(musicBackgroundOpacity);
+    applyRecordDiscOpacity(Number.isFinite(currentUser?.recordDiscOpacity) ? currentUser.recordDiscOpacity : 1);
     applyCursorStyle(cursorStyle);
     applyLogoNeonColor(logoNeonColor);
     renderWelcomeMessage(currentUser);
@@ -744,6 +755,12 @@ function applyMusicBackgroundOpacity(opacityValue) {
     const nextOpacity = Number.isFinite(opacityValue) ? Math.min(1, Math.max(0, opacityValue)) : 1;
     document.documentElement.style.setProperty("--music-track-bg-opacity", String(nextOpacity));
     document.getElementById("music-page")?.style.setProperty("--music-track-bg-opacity", String(nextOpacity));
+}
+
+function applyRecordDiscOpacity(value) {
+    const v = Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 1;
+    document.documentElement.style.setProperty("--music-record-disc-opacity", String(v));
+    document.getElementById("music-page")?.style.setProperty("--music-record-disc-opacity", String(v));
 }
 
 function applyLogoNeonColor(color) {
@@ -2458,6 +2475,9 @@ async function saveProfileSettings() {
         users[currentIndex].showShortcuts = showShortcutsToggle.checked;
         users[currentIndex].applyMusicHeaderWallpaper = applyMusicHeaderWallpaperInput.checked;
         users[currentIndex].musicBackgroundOpacity = Math.min(1, Math.max(0, Number(musicBackgroundOpacityInput.value || 100) / 100));
+        if (recordDiscOpacityInput) {
+            users[currentIndex].recordDiscOpacity = Math.min(1, Math.max(0, Number(recordDiscOpacityInput.value || 100) / 100));
+        }
         if (pendingBackgroundReset) {
             users[currentIndex].backgroundImage = "";
         } else if (pendingBackgroundImage !== null) {

@@ -754,6 +754,7 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
     --music-record-border: 116,214,255;
     --music-record-neon: 116,214,255;
     --music-record-opacity: 1;
+    --music-record-disc-opacity: 1;
     --music-record-border-opacity: 0.04;
     --music-record-neon-opacity: 0.32;
     --music-action-bg: 255,255,255;
@@ -1375,7 +1376,7 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
     border: none;
     cursor: pointer;
     background: transparent;
-    opacity: var(--music-record-opacity);
+    opacity: calc(var(--music-record-opacity) * var(--music-record-disc-opacity));
     box-shadow:
         0 0 0 2px rgba(var(--music-record-border), var(--music-record-border-opacity)),
         0 0 24px rgba(var(--music-record-neon), var(--music-record-neon-opacity)),

@@ -1149,7 +1149,7 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
     border: 1px solid rgba(17,17,17,0.08);
     box-shadow: 0 24px 40px rgba(17,17,17,0.16);
     z-index: 2300;
-    overflow: hidden;
+    overflow: auto;
 }
 
 .mini-video-resize-handle {

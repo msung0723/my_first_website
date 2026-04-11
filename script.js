@@ -2177,6 +2177,7 @@ function showPage(pageId) {
     }
     if (videoState.currentVideoId && videoState.isMiniPlayer) {
         requestAnimationFrame(() => refreshVideoFrameLayout());
+        setTimeout(() => refreshVideoFrameLayout(), 80);
     }
 }
 
@@ -5330,6 +5331,12 @@ function attachVideoPlayer(host, autoplay) {
 function positionVideoFrameOver(host) {
     if (!host || videoPlayerFrame.classList.contains("hidden")) return;
     const rect = host.getBoundingClientRect();
+    if (rect.width < 40 || rect.height < 40) {
+        if (videoState.currentVideoId && videoState.isMiniPlayer) {
+            requestAnimationFrame(() => positionVideoFrameOver(host));
+        }
+        return;
+    }
     videoPlayerFrame.style.left = `${rect.left}px`;
     videoPlayerFrame.style.top = `${rect.top}px`;
     videoPlayerFrame.style.width = `${rect.width}px`;

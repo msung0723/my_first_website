@@ -138,6 +138,33 @@
         </div>
     </div>
 
+    <div id="track-background-video-modal" class="hidden auth-overlay">
+        <div class="auth-box playlist-editor-box track-background-video-modal">
+            <div class="playlist-editor-header">
+                <h2>배경 영상 설정</h2>
+                <button id="close-track-background-video-modal" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="text" id="track-background-video-url" class="large-input" placeholder="유튜브 링크">
+            <div class="track-background-video-preview">
+                <div id="track-background-video-player"></div>
+            </div>
+            <div class="track-background-video-controls">
+                <button id="track-background-video-toggle" class="nav-btn" type="button">재생 / 일시정지</button>
+                <button id="track-background-video-use-current" class="nav-btn gray" type="button">현재 위치를 시작점으로</button>
+            </div>
+            <div class="track-background-video-timeline">
+                <span id="track-background-video-current-time">0.00초</span>
+                <input id="track-background-video-range" type="range" min="0" max="0" step="0.01" value="0">
+                <span id="track-background-video-duration">0.00초</span>
+            </div>
+            <div class="track-background-video-start-readout">시작 지점: <strong id="track-background-video-start-display">0.00초</strong></div>
+            <div class="button-group">
+                <button id="save-track-background-video" class="large-btn" type="button">저장하기</button>
+                <button id="clear-track-background-video" class="nav-btn gray" type="button">영상 배경 삭제</button>
+            </div>
+        </div>
+    </div>
+
     <div id="record-style-modal" class="hidden auth-overlay">
         <div class="auth-box playlist-editor-box draggable-panel" data-draggable-panel="record-style">
             <div class="playlist-editor-header draggable-handle">
@@ -420,13 +447,7 @@
 
     <section id="music-page" class="hidden">
         <div id="music-video-backdrop" class="music-video-backdrop hidden">
-            <iframe
-                id="music-video-backdrop-frame"
-                src=""
-                title="Music background video"
-                allow="autoplay; encrypted-media; picture-in-picture"
-                referrerpolicy="strict-origin-when-cross-origin">
-            </iframe>
+            <div id="music-video-backdrop-frame"></div>
         </div>
         <div class="music-layout">
             <div class="music-center">

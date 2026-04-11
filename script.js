@@ -104,6 +104,18 @@ const recordHint = document.getElementById("record-hint");
 const nowPlayingTitle = document.getElementById("now-playing-title");
 const musicVideoBackdrop = document.getElementById("music-video-backdrop");
 const musicVideoBackdropFrame = document.getElementById("music-video-backdrop-frame");
+const trackBackgroundVideoModal = document.getElementById("track-background-video-modal");
+const closeTrackBackgroundVideoModalBtn = document.getElementById("close-track-background-video-modal");
+const trackBackgroundVideoUrlInput = document.getElementById("track-background-video-url");
+const trackBackgroundVideoPlayerHost = document.getElementById("track-background-video-player");
+const trackBackgroundVideoToggleBtn = document.getElementById("track-background-video-toggle");
+const trackBackgroundVideoUseCurrentBtn = document.getElementById("track-background-video-use-current");
+const trackBackgroundVideoRange = document.getElementById("track-background-video-range");
+const trackBackgroundVideoCurrentTime = document.getElementById("track-background-video-current-time");
+const trackBackgroundVideoDuration = document.getElementById("track-background-video-duration");
+const trackBackgroundVideoStartDisplay = document.getElementById("track-background-video-start-display");
+const saveTrackBackgroundVideoBtn = document.getElementById("save-track-background-video");
+const clearTrackBackgroundVideoBtn = document.getElementById("clear-track-background-video");
 const transportToggleBtn = document.getElementById("transport-toggle");
 const transportToggleIcon = document.getElementById("transport-toggle-icon");
 const playbackCurrentTime = document.getElementById("playback-current-time");
@@ -269,6 +281,17 @@ let youtubePlayer = null;
 let youtubeApiPromise = null;
 let youtubeReadyResolver = null;
 let youtubePlayerReadyPromise = null;
+let musicBackgroundVideoPlayer = null;
+let musicBackgroundVideoPlayerReadyPromise = null;
+let lastAppliedMusicBackgroundVideoConfig = "";
+let musicBackgroundVideoFreezeTimer = null;
+let trackBackgroundVideoEditorPlayer = null;
+let trackBackgroundVideoEditorReadyPromise = null;
+let pendingTrackBackgroundVideoTargetId = null;
+let pendingTrackBackgroundVideoId = "";
+let pendingTrackBackgroundVideoStart = 0;
+let trackBackgroundVideoEditorInterval = null;
+let isDraggingTrackBackgroundVideoRange = false;
 let playbackMonitorInterval = null;
 let isScrubbingPlayback = false;
 let pendingTrackArtTargetId = null;
@@ -1584,6 +1607,7 @@ function normalizeTrackData(track = {}) {
         customRecordArt: "",
         customBackgroundArt: "",
         customBackgroundVideoId: "",
+        customBackgroundVideoStart: 0,
         rotateRecord: true,
         ...track
     };
@@ -3297,6 +3321,565 @@ function renderLibraryPicker() {
         row.append(meta, addBtn);
         libraryPickerList.appendChild(row);
     });
+}
+
+function formatPreciseSeconds(seconds) {
+    const safe = Math.max(0, Number(seconds) || 0);
+    return `${safe.toFixed(2)}초`;
+}
+
+function updateTrackBackgroundVideoStartDisplay(value) {
+    const safe = Math.max(0, Number(value) || 0);
+    pendingTrackBackgroundVideoStart = safe;
+    if (trackBackgroundVideoStartDisplay) {
+        trackBackgroundVideoStartDisplay.textContent = formatPreciseSeconds(safe);
+    }
+    if (trackBackgroundVideoCurrentTime && isDraggingTrackBackgroundVideoRange) {
+        trackBackgroundVideoCurrentTime.textContent = formatPreciseSeconds(safe);
+    }
+}
+
+async function ensureTrackBackgroundVideoEditorPlayer() {
+    await loadYoutubeApi();
+
+    if (trackBackgroundVideoEditorPlayer && trackBackgroundVideoEditorReadyPromise) {
+        await trackBackgroundVideoEditorReadyPromise;
+        return trackBackgroundVideoEditorPlayer;
+    }
+
+    if (trackBackgroundVideoEditorReadyPromise) {
+        await trackBackgroundVideoEditorReadyPromise;
+        return trackBackgroundVideoEditorPlayer;
+    }
+
+    trackBackgroundVideoEditorReadyPromise = new Promise((resolve) => {
+        trackBackgroundVideoEditorPlayer = new window.YT.Player("track-background-video-player", {
+            width: "100%",
+            height: "100%",
+            videoId: "",
+            playerVars: {
+                autoplay: 0,
+                controls: 1,
+                modestbranding: 1,
+                rel: 0,
+                playsinline: 1
+            },
+            events: {
+                onReady: () => resolve()
+            }
+        });
+    });
+
+    await trackBackgroundVideoEditorReadyPromise;
+    return trackBackgroundVideoEditorPlayer;
+}
+
+function stopTrackBackgroundVideoEditorMonitor() {
+    if (trackBackgroundVideoEditorInterval) {
+        clearInterval(trackBackgroundVideoEditorInterval);
+        trackBackgroundVideoEditorInterval = null;
+    }
+}
+
+function syncTrackBackgroundVideoEditorUi() {
+    if (!trackBackgroundVideoEditorPlayer) return;
+    const currentTime = typeof trackBackgroundVideoEditorPlayer.getCurrentTime === "function"
+        ? trackBackgroundVideoEditorPlayer.getCurrentTime()
+        : 0;
+    const duration = typeof trackBackgroundVideoEditorPlayer.getDuration === "function"
+        ? trackBackgroundVideoEditorPlayer.getDuration()
+        : 0;
+
+    if (trackBackgroundVideoDuration) {
+        trackBackgroundVideoDuration.textContent = formatPreciseSeconds(duration);
+    }
+    if (trackBackgroundVideoCurrentTime && !isDraggingTrackBackgroundVideoRange) {
+        trackBackgroundVideoCurrentTime.textContent = formatPreciseSeconds(currentTime);
+    }
+    if (trackBackgroundVideoRange) {
+        trackBackgroundVideoRange.max = String(Math.max(duration, 0));
+        if (!isDraggingTrackBackgroundVideoRange) {
+            trackBackgroundVideoRange.value = String(currentTime);
+        }
+    }
+}
+
+function startTrackBackgroundVideoEditorMonitor() {
+    stopTrackBackgroundVideoEditorMonitor();
+    trackBackgroundVideoEditorInterval = window.setInterval(syncTrackBackgroundVideoEditorUi, 100);
+}
+
+async function loadTrackBackgroundVideoEditorPreview() {
+    const youtubeUrl = trackBackgroundVideoUrlInput?.value.trim() || "";
+    const youtubeId = extractYouTubeId(youtubeUrl);
+    if (!youtubeId) return false;
+
+    const player = await ensureTrackBackgroundVideoEditorPlayer();
+    pendingTrackBackgroundVideoId = youtubeId;
+
+    if (typeof player.loadVideoById === "function") {
+        player.loadVideoById({
+            videoId: youtubeId,
+            startSeconds: pendingTrackBackgroundVideoStart
+        });
+    }
+    if (typeof player.seekTo === "function") {
+        player.seekTo(pendingTrackBackgroundVideoStart, true);
+    }
+    syncTrackBackgroundVideoEditorUi();
+    startTrackBackgroundVideoEditorMonitor();
+    return true;
+}
+
+function closeTrackBackgroundVideoModal() {
+    trackBackgroundVideoModal?.classList.add("hidden");
+    stopTrackBackgroundVideoEditorMonitor();
+    if (trackBackgroundVideoEditorPlayer && typeof trackBackgroundVideoEditorPlayer.pauseVideo === "function") {
+        try {
+            trackBackgroundVideoEditorPlayer.pauseVideo();
+        } catch (error) {
+            console.warn("Failed to pause track background video editor", error);
+        }
+    }
+    pendingTrackBackgroundVideoTargetId = null;
+}
+
+async function openTrackBackgroundVideoModal(trackId) {
+    const track = getTrackById(trackId);
+    if (!track) return;
+
+    pendingTrackBackgroundVideoTargetId = trackId;
+    pendingTrackBackgroundVideoId = track.customBackgroundVideoId || "";
+    pendingTrackBackgroundVideoStart = Math.max(0, Number(track.customBackgroundVideoStart || 0));
+
+    if (trackBackgroundVideoUrlInput) {
+        trackBackgroundVideoUrlInput.value = pendingTrackBackgroundVideoId
+            ? `https://www.youtube.com/watch?v=${pendingTrackBackgroundVideoId}`
+            : "";
+    }
+    if (trackBackgroundVideoRange) {
+        trackBackgroundVideoRange.value = String(pendingTrackBackgroundVideoStart);
+    }
+    updateTrackBackgroundVideoStartDisplay(pendingTrackBackgroundVideoStart);
+    if (trackBackgroundVideoCurrentTime) {
+        trackBackgroundVideoCurrentTime.textContent = formatPreciseSeconds(pendingTrackBackgroundVideoStart);
+    }
+    if (trackBackgroundVideoDuration) {
+        trackBackgroundVideoDuration.textContent = "0.00초";
+    }
+
+    trackBackgroundVideoModal?.classList.remove("hidden");
+    await loadTrackBackgroundVideoEditorPreview();
+}
+
+function requestTrackBackgroundVideo(trackId) {
+    openTrackBackgroundVideoModal(trackId);
+}
+
+async function saveTrackBackgroundVideoSettings() {
+    const track = getTrackById(pendingTrackBackgroundVideoTargetId);
+    if (!track) return;
+
+    const youtubeUrl = trackBackgroundVideoUrlInput?.value.trim() || "";
+    const youtubeId = extractYouTubeId(youtubeUrl);
+    if (!youtubeId) {
+        alert("올바른 유튜브 링크를 입력해 주세요.");
+        return;
+    }
+
+    track.customBackgroundVideoId = youtubeId;
+    track.customBackgroundVideoStart = Math.max(0, Number(pendingTrackBackgroundVideoStart || 0));
+    track.customBackgroundArt = "";
+    saveMusicState();
+    renderMusicUI();
+    renderLibraryPickerIfVisible();
+    closeTrackBackgroundVideoModal();
+}
+
+function initTrackBackgroundVideoEditor() {
+    if (!trackBackgroundVideoModal) return;
+
+    closeTrackBackgroundVideoModalBtn?.addEventListener("click", closeTrackBackgroundVideoModal);
+    trackBackgroundVideoModal.addEventListener("click", (event) => {
+        if (event.target === trackBackgroundVideoModal) {
+            closeTrackBackgroundVideoModal();
+        }
+    });
+
+    trackBackgroundVideoUrlInput?.addEventListener("change", () => {
+        pendingTrackBackgroundVideoStart = 0;
+        updateTrackBackgroundVideoStartDisplay(0);
+        loadTrackBackgroundVideoEditorPreview();
+    });
+
+    trackBackgroundVideoToggleBtn?.addEventListener("click", async () => {
+        const ok = await loadTrackBackgroundVideoEditorPreview();
+        if (!ok || !trackBackgroundVideoEditorPlayer || !window.YT) return;
+        const state = typeof trackBackgroundVideoEditorPlayer.getPlayerState === "function"
+            ? trackBackgroundVideoEditorPlayer.getPlayerState()
+            : window.YT.PlayerState.UNSTARTED;
+        if (state === window.YT.PlayerState.PLAYING) {
+            trackBackgroundVideoEditorPlayer.pauseVideo();
+        } else {
+            trackBackgroundVideoEditorPlayer.playVideo();
+        }
+    });
+
+    trackBackgroundVideoUseCurrentBtn?.addEventListener("click", () => {
+        if (!trackBackgroundVideoEditorPlayer || typeof trackBackgroundVideoEditorPlayer.getCurrentTime !== "function") return;
+        const currentTime = trackBackgroundVideoEditorPlayer.getCurrentTime();
+        if (trackBackgroundVideoRange) {
+            trackBackgroundVideoRange.value = String(currentTime);
+        }
+        updateTrackBackgroundVideoStartDisplay(currentTime);
+        if (trackBackgroundVideoCurrentTime) {
+            trackBackgroundVideoCurrentTime.textContent = formatPreciseSeconds(currentTime);
+        }
+    });
+
+    trackBackgroundVideoRange?.addEventListener("input", () => {
+        isDraggingTrackBackgroundVideoRange = true;
+        const nextTime = Number(trackBackgroundVideoRange.value || 0);
+        updateTrackBackgroundVideoStartDisplay(nextTime);
+        if (trackBackgroundVideoCurrentTime) {
+            trackBackgroundVideoCurrentTime.textContent = formatPreciseSeconds(nextTime);
+        }
+        if (trackBackgroundVideoEditorPlayer && typeof trackBackgroundVideoEditorPlayer.seekTo === "function") {
+            trackBackgroundVideoEditorPlayer.seekTo(nextTime, true);
+        }
+    });
+
+    trackBackgroundVideoRange?.addEventListener("change", () => {
+        isDraggingTrackBackgroundVideoRange = false;
+        syncTrackBackgroundVideoEditorUi();
+    });
+
+    saveTrackBackgroundVideoBtn?.addEventListener("click", saveTrackBackgroundVideoSettings);
+    clearTrackBackgroundVideoBtn?.addEventListener("click", () => {
+        const track = getTrackById(pendingTrackBackgroundVideoTargetId);
+        if (!track) return;
+        track.customBackgroundVideoId = "";
+        track.customBackgroundVideoStart = 0;
+        saveMusicState();
+        renderMusicUI();
+        renderLibraryPickerIfVisible();
+        closeTrackBackgroundVideoModal();
+    });
+}
+
+window.addEventListener("load", initTrackBackgroundVideoEditor);
+
+function attachVideoPlayer(host, autoplay) {
+    const currentVideo = getCurrentVideo();
+    if (!host || !currentVideo) return;
+
+    const src = `https://www.youtube.com/embed/${currentVideo.youtubeId}?autoplay=${autoplay ? 1 : 0}&rel=0&modestbranding=1&enablejsapi=1`;
+    if (videoPlayerFrame.dataset.videoId !== currentVideo.youtubeId || videoPlayerFrame.src !== src) {
+        videoPlayerFrame.src = src;
+        videoPlayerFrame.dataset.videoId = currentVideo.youtubeId;
+    }
+
+    if (videoPlayerFrame.parentElement !== host) {
+        host.appendChild(videoPlayerFrame);
+    }
+
+    videoPlayerFrame.classList.remove("hidden");
+    videoPlayerFrame.style.position = "absolute";
+    videoPlayerFrame.style.inset = "0";
+    videoPlayerFrame.style.left = "0";
+    videoPlayerFrame.style.top = "0";
+    videoPlayerFrame.style.width = "100%";
+    videoPlayerFrame.style.height = "100%";
+    videoPlayerFrame.style.zIndex = "1";
+}
+
+function positionVideoFrameOver(host) {
+    if (!host || videoPlayerFrame.classList.contains("hidden")) return;
+    if (videoPlayerFrame.parentElement !== host) {
+        host.appendChild(videoPlayerFrame);
+    }
+    videoPlayerFrame.style.position = "absolute";
+    videoPlayerFrame.style.inset = "0";
+    videoPlayerFrame.style.left = "0";
+    videoPlayerFrame.style.top = "0";
+    videoPlayerFrame.style.width = "100%";
+    videoPlayerFrame.style.height = "100%";
+    videoPlayerFrame.style.zIndex = "1";
+}
+
+function refreshVideoFrameLayout() {
+    const currentVideo = getCurrentVideo();
+    if (!currentVideo) return;
+    const host = videoState.isMiniPlayer ? videoPlayerMiniHost : videoPlayerMainHost;
+    if (!host) return;
+    positionVideoFrameOver(host);
+}
+
+function closeVideoViewer(clearCurrent) {
+    videoPlayerFrame.src = "";
+    delete videoPlayerFrame.dataset.videoId;
+    videoPlayerFrame.classList.add("hidden");
+    videoPlayerFrame.style.position = "";
+    videoPlayerFrame.style.inset = "";
+    videoPlayerFrame.style.left = "";
+    videoPlayerFrame.style.top = "";
+    videoPlayerFrame.style.width = "";
+    videoPlayerFrame.style.height = "";
+    videoPlayerFrame.style.zIndex = "";
+    videoViewer.classList.add("hidden");
+    miniVideoPlayer.classList.add("hidden");
+    if (clearCurrent) {
+        videoState.currentVideoId = null;
+        videoState.isMiniPlayer = false;
+    }
+}
+
+function parseMusicBackgroundVideoStart(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return 0;
+
+    if (raw.includes(":")) {
+        const parts = raw.split(":").map((part) => Number(part.trim()));
+        if (parts.some((part) => !Number.isFinite(part) || part < 0)) return NaN;
+        let total = 0;
+        for (const part of parts) {
+            total = total * 60 + part;
+        }
+        return total;
+    }
+
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) && numeric >= 0 ? numeric : NaN;
+}
+
+function requestTrackBackgroundVideo(trackId) {
+    const track = getTrackById(trackId);
+    if (!track) return;
+
+    const currentUrl = track.customBackgroundVideoId
+        ? `https://www.youtube.com/watch?v=${track.customBackgroundVideoId}`
+        : "";
+    const urlInput = prompt("배경으로 사용할 유튜브 링크를 입력해 주세요.", currentUrl);
+    if (urlInput === null) return;
+
+    const trimmedUrl = urlInput.trim();
+    if (!trimmedUrl) {
+        track.customBackgroundVideoId = "";
+        track.customBackgroundVideoStart = 0;
+        saveMusicState();
+        renderMusicUI();
+        renderLibraryPickerIfVisible();
+        return;
+    }
+
+    const youtubeId = extractYouTubeId(trimmedUrl);
+    if (!youtubeId) {
+        alert("올바른 유튜브 링크를 입력해 주세요.");
+        return;
+    }
+
+    const startInput = prompt(
+        "배경 영상 시작 시점을 입력해 주세요. 소수점 입력이 가능합니다. 예: 12.35 또는 1:23.45",
+        String(track.customBackgroundVideoStart || 0)
+    );
+    if (startInput === null) return;
+
+    const startSeconds = parseMusicBackgroundVideoStart(startInput);
+    if (!Number.isFinite(startSeconds) || startSeconds < 0) {
+        alert("시작 시점은 0 이상의 숫자 또는 분:초 형식으로 입력해 주세요.");
+        return;
+    }
+
+    track.customBackgroundVideoId = youtubeId;
+    track.customBackgroundVideoStart = startSeconds;
+    track.customBackgroundArt = "";
+    saveMusicState();
+    renderMusicUI();
+    renderLibraryPickerIfVisible();
+}
+
+async function ensureMusicBackgroundVideoPlayer() {
+    await loadYoutubeApi();
+
+    if (musicBackgroundVideoPlayer && musicBackgroundVideoPlayerReadyPromise) {
+        await musicBackgroundVideoPlayerReadyPromise;
+        return musicBackgroundVideoPlayer;
+    }
+
+    if (musicBackgroundVideoPlayerReadyPromise) {
+        await musicBackgroundVideoPlayerReadyPromise;
+        return musicBackgroundVideoPlayer;
+    }
+
+    musicBackgroundVideoPlayerReadyPromise = new Promise((resolve) => {
+        musicBackgroundVideoPlayer = new window.YT.Player("music-video-backdrop-frame", {
+            width: "100%",
+            height: "100%",
+            videoId: "",
+            playerVars: {
+                autoplay: 1,
+                controls: 0,
+                disablekb: 1,
+                fs: 0,
+                modestbranding: 1,
+                playsinline: 1,
+                rel: 0
+            },
+            events: {
+                onReady: () => resolve(),
+                onStateChange: handleMusicBackgroundVideoStateChange
+            }
+        });
+    });
+
+    await musicBackgroundVideoPlayerReadyPromise;
+    return musicBackgroundVideoPlayer;
+}
+
+function handleMusicBackgroundVideoStateChange(event) {
+    if (!window.YT || !musicBackgroundVideoPlayer) return;
+    if (event.data !== window.YT.PlayerState.ENDED) return;
+
+    if (musicBackgroundVideoFreezeTimer) {
+        clearTimeout(musicBackgroundVideoFreezeTimer);
+    }
+
+    musicBackgroundVideoFreezeTimer = window.setTimeout(() => {
+        try {
+            const track = getTrackForMusicVisuals();
+            const startSeconds = Math.max(0, Number(track?.customBackgroundVideoStart || 0));
+            const duration = typeof musicBackgroundVideoPlayer.getDuration === "function"
+                ? musicBackgroundVideoPlayer.getDuration()
+                : 0;
+            const freezeAt = Math.max(startSeconds, duration > 0 ? duration - 0.05 : startSeconds);
+            if (typeof musicBackgroundVideoPlayer.seekTo === "function") {
+                musicBackgroundVideoPlayer.seekTo(freezeAt, true);
+            }
+            if (typeof musicBackgroundVideoPlayer.pauseVideo === "function") {
+                musicBackgroundVideoPlayer.pauseVideo();
+            }
+        } catch (error) {
+            console.warn("Failed to freeze music background video", error);
+        }
+    }, 80);
+}
+
+function stopMusicBackgroundVideoPlayback() {
+    if (musicBackgroundVideoFreezeTimer) {
+        clearTimeout(musicBackgroundVideoFreezeTimer);
+        musicBackgroundVideoFreezeTimer = null;
+    }
+    if (musicVideoBackdrop) {
+        musicVideoBackdrop.classList.add("hidden");
+        musicVideoBackdrop.style.opacity = "0";
+    }
+    if (musicBackgroundVideoPlayer && typeof musicBackgroundVideoPlayer.stopVideo === "function") {
+        try {
+            musicBackgroundVideoPlayer.stopVideo();
+        } catch (error) {
+            console.warn("Failed to stop music background video", error);
+        }
+    }
+    lastAppliedMusicBackgroundVideoConfig = "";
+}
+
+async function applyMusicTrackBackdrop() {
+    const musicPage = document.getElementById("music-page");
+    if (!musicPage) return;
+    const isMusicPageVisible = !musicPage.classList.contains("hidden");
+
+    const activeTrack = getTrackForMusicVisuals();
+    const backgroundArt = activeTrack?.customBackgroundArt || "";
+    const backgroundVideoId = activeTrack?.customBackgroundVideoId || "";
+    const backgroundVideoStart = Math.max(0, Number(activeTrack?.customBackgroundVideoStart || 0));
+    const currentUser = getCurrentUser();
+    const musicBackgroundOpacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
+        ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
+        : Math.min(1, Math.max(0, Number(musicBackgroundOpacityInput?.value || 100) / 100));
+    const applyMusicHeaderWallpaper = currentUser?.applyMusicHeaderWallpaper !== false
+        && Boolean(applyMusicHeaderWallpaperInput?.checked ?? true);
+    const wallpaperImage = pendingBackgroundImage !== null
+        ? pendingBackgroundImage
+        : (currentUser?.backgroundImage || "");
+    const applyHeaderWallpaper = Boolean(applyHeaderWallpaperInput?.checked || currentUser?.applyHeaderWallpaper);
+    const backdropKey = backgroundVideoId
+        ? `video:${backgroundVideoId}@${backgroundVideoStart}`
+        : (backgroundArt ? `image:${backgroundArt}` : "");
+
+    if (!backgroundArt && !backgroundVideoId) {
+        lastAppliedMusicBackground = "";
+        musicPage.classList.remove("has-track-background", "track-backdrop-refresh");
+        musicPage.style.setProperty("--music-track-bg-url", "none");
+        musicPage.style.setProperty("--music-track-bg-opacity", "0");
+        stopMusicBackgroundVideoPlayback();
+        if (isMusicPageVisible) {
+            applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        }
+        return;
+    }
+
+    const hasChanged = backdropKey !== lastAppliedMusicBackground;
+    lastAppliedMusicBackground = backdropKey;
+    musicPage.style.setProperty("--music-track-bg-opacity", String(musicBackgroundOpacity));
+
+    if (backgroundVideoId) {
+        musicPage.classList.remove("has-track-background");
+        musicPage.style.setProperty("--music-track-bg-url", "none");
+
+        if (!isMusicPageVisible) {
+            stopMusicBackgroundVideoPlayback();
+            return;
+        }
+
+        if (musicVideoBackdrop) {
+            musicVideoBackdrop.classList.remove("hidden");
+            musicVideoBackdrop.style.opacity = String(musicBackgroundOpacity);
+        }
+
+        const player = await ensureMusicBackgroundVideoPlayer();
+        if (player) {
+            const videoConfig = `${backgroundVideoId}@${backgroundVideoStart}`;
+            if (videoConfig !== lastAppliedMusicBackgroundVideoConfig) {
+                lastAppliedMusicBackgroundVideoConfig = videoConfig;
+                if (typeof player.mute === "function") player.mute();
+                if (typeof player.loadVideoById === "function") {
+                    player.loadVideoById({
+                        videoId: backgroundVideoId,
+                        startSeconds: backgroundVideoStart
+                    });
+                }
+                if (typeof player.playVideo === "function") {
+                    player.playVideo();
+                }
+            }
+        }
+
+        applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+    } else {
+        stopMusicBackgroundVideoPlayback();
+        musicPage.classList.add("has-track-background");
+        musicPage.style.setProperty("--music-track-bg-url", `url("${backgroundArt}")`);
+
+        if (isMusicPageVisible && applyMusicHeaderWallpaper) {
+            pageHeader.style.setProperty("background-color", "#ffffff", "important");
+            pageHeader.style.setProperty(
+                "background-image",
+                `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(${backgroundArt})`,
+                "important"
+            );
+            pageHeader.style.setProperty("background-position", "center top", "important");
+            pageHeader.style.setProperty("background-size", "cover", "important");
+            pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+        } else if (isMusicPageVisible) {
+            applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        }
+    }
+
+    if (hasChanged) {
+        musicPage.classList.remove("track-backdrop-refresh");
+        void musicPage.offsetWidth;
+        musicPage.classList.add("track-backdrop-refresh");
+    }
 }
 
 function addTrackToCurrentPlaylist(trackId) {

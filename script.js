@@ -6190,6 +6190,114 @@ function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
 
+function attachVideoPlayer(host, autoplay) {
+    const currentVideo = getCurrentVideo();
+    if (!host || !currentVideo) return;
+    const src = `https://www.youtube.com/embed/${currentVideo.youtubeId}?autoplay=${autoplay ? 1 : 0}&rel=0&modestbranding=1&enablejsapi=1`;
+
+    if (videoPlayerFrame.dataset.videoId !== currentVideo.youtubeId || videoPlayerFrame.src !== src) {
+        videoPlayerFrame.src = src;
+        videoPlayerFrame.dataset.videoId = currentVideo.youtubeId;
+    }
+
+    if (videoPlayerFrame.parentElement !== host) {
+        host.appendChild(videoPlayerFrame);
+    }
+
+    videoPlayerFrame.classList.remove("hidden");
+    videoPlayerFrame.style.position = "absolute";
+    videoPlayerFrame.style.inset = "0";
+    videoPlayerFrame.style.left = "0";
+    videoPlayerFrame.style.top = "0";
+    videoPlayerFrame.style.width = "100%";
+    videoPlayerFrame.style.height = "100%";
+    videoPlayerFrame.style.zIndex = "1";
+    videoPlayerFrame.style.background = "#0b1015";
+}
+
+function positionVideoFrameOver(host) {
+    if (!host || videoPlayerFrame.classList.contains("hidden")) return;
+    if (videoPlayerFrame.parentElement !== host) {
+        host.appendChild(videoPlayerFrame);
+    }
+    videoPlayerFrame.style.position = "absolute";
+    videoPlayerFrame.style.inset = "0";
+    videoPlayerFrame.style.left = "0";
+    videoPlayerFrame.style.top = "0";
+    videoPlayerFrame.style.width = "100%";
+    videoPlayerFrame.style.height = "100%";
+    videoPlayerFrame.style.zIndex = "1";
+}
+
+function refreshVideoFrameLayout() {
+    const currentVideo = getCurrentVideo();
+    if (!currentVideo) return;
+    const host = videoState.isMiniPlayer ? videoPlayerMiniHost : videoPlayerMainHost;
+    if (!host) return;
+    requestAnimationFrame(() => positionVideoFrameOver(host));
+}
+
+function syncVideoViewer() {
+    const currentVideo = getCurrentVideo();
+    if (!currentVideo) {
+        videoViewer.classList.add("hidden");
+        miniVideoPlayer.classList.add("hidden");
+        videoPlayerFrame.classList.add("hidden");
+        return;
+    }
+
+    videoEditorTitle.value = currentVideo.title || "";
+    videoEditorDescription.value = currentVideo.description || "";
+    miniVideoTitle.textContent = currentVideo.title || "영상 재생 중";
+    renderCurrentVideoTags();
+
+    if (videoState.isMiniPlayer) {
+        miniVideoPlayer.classList.remove("hidden");
+        videoViewer.classList.add("hidden");
+        attachVideoPlayer(videoPlayerMiniHost, true);
+    } else {
+        miniVideoPlayer.classList.add("hidden");
+        videoViewer.classList.remove("hidden");
+        attachVideoPlayer(videoPlayerMainHost, true);
+    }
+}
+
+function closeVideoViewer(clearCurrent) {
+    videoPlayerFrame.src = "";
+    delete videoPlayerFrame.dataset.videoId;
+    videoPlayerFrame.classList.add("hidden");
+    videoPlayerFrame.style.position = "";
+    videoPlayerFrame.style.inset = "";
+    videoPlayerFrame.style.left = "";
+    videoPlayerFrame.style.top = "";
+    videoPlayerFrame.style.width = "";
+    videoPlayerFrame.style.height = "";
+    videoPlayerFrame.style.zIndex = "";
+    videoViewer.classList.add("hidden");
+    miniVideoPlayer.classList.add("hidden");
+    if (clearCurrent) {
+        videoState.currentVideoId = null;
+        videoState.isMiniPlayer = false;
+    }
+}
+
+function requestTrackBackgroundVideo(trackId) {
+    openTrackBackgroundVideoModal(trackId);
+}
+
+if (typeof initTrackBackgroundVideoEditor === "function") {
+    const __originalInitTrackBackgroundVideoEditor = initTrackBackgroundVideoEditor;
+    initTrackBackgroundVideoEditor = function() {
+        if (window.__trackBackgroundVideoEditorInitialized) return;
+        window.__trackBackgroundVideoEditorInitialized = true;
+        return __originalInitTrackBackgroundVideoEditor();
+    };
+}
+
+if (typeof initTrackBackgroundVideoEditor === "function") {
+    initTrackBackgroundVideoEditor();
+}
+
 function handleTrackBackgroundUpload(event) {
     const file = event.target.files?.[0];
     const targetTrack = getTrackById(pendingTrackBackgroundTargetId);

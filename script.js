@@ -7764,6 +7764,7 @@ applyMusicTrackBackdrop = async function() {
     const musicPage = document.getElementById("music-page");
     if (!musicPage) return;
     const isMusicPageVisible = !musicPage.classList.contains("hidden");
+    const isTrackPlaying = typeof isPlaybackActive === "function" ? isPlaybackActive() : false;
 
     const activeTrack = getTrackForMusicVisuals();
     const backgroundArt = activeTrack?.customBackgroundArt || "";
@@ -7820,7 +7821,10 @@ applyMusicTrackBackdrop = async function() {
             musicVideoBackdrop.style.backgroundRepeat = "no-repeat";
 
             const videoConfig = `${backgroundVideoId}@${backgroundVideoStart}`;
-            if (videoConfig !== lastAppliedMusicBackgroundVideoConfig || !musicVideoBackdrop.querySelector("iframe")) {
+            if (!isTrackPlaying) {
+                lastAppliedMusicBackgroundVideoConfig = "";
+                musicVideoBackdrop.innerHTML = '<div id="music-video-backdrop-frame"></div>';
+            } else if (videoConfig !== lastAppliedMusicBackgroundVideoConfig || !musicVideoBackdrop.querySelector("iframe")) {
                 lastAppliedMusicBackgroundVideoConfig = videoConfig;
                 const embedUrl = `https://www.youtube.com/embed/${backgroundVideoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${backgroundVideoId}&start=${Math.floor(backgroundVideoStart)}&modestbranding=1&playsinline=1&rel=0`;
                 musicVideoBackdrop.innerHTML = `<div id="music-video-backdrop-frame"></div><iframe src="${embedUrl}" title="Music background video" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;

@@ -7745,6 +7745,21 @@ requestTrackBackgroundVideo = function(trackId) {
     }
 };
 
+stopMusicBackgroundVideoPlayback = function() {
+    clearTimeout(musicBackgroundVideoFreezeTimer);
+    musicBackgroundVideoFreezeTimer = null;
+    lastAppliedMusicBackgroundVideoConfig = "";
+    if (musicVideoBackdrop) {
+        musicVideoBackdrop.classList.add("hidden");
+        musicVideoBackdrop.style.opacity = "0";
+        musicVideoBackdrop.style.backgroundImage = "";
+        musicVideoBackdrop.style.backgroundPosition = "";
+        musicVideoBackdrop.style.backgroundSize = "";
+        musicVideoBackdrop.style.backgroundRepeat = "";
+        musicVideoBackdrop.innerHTML = '<div id="music-video-backdrop-frame"></div>';
+    }
+};
+
 applyMusicTrackBackdrop = async function() {
     const musicPage = document.getElementById("music-page");
     if (!musicPage) return;
@@ -7799,23 +7814,16 @@ applyMusicTrackBackdrop = async function() {
         if (musicVideoBackdrop) {
             musicVideoBackdrop.classList.remove("hidden");
             musicVideoBackdrop.style.opacity = String(musicBackgroundOpacity);
-        }
+            musicVideoBackdrop.style.backgroundImage = `url(https://i.ytimg.com/vi/${backgroundVideoId}/hqdefault.jpg)`;
+            musicVideoBackdrop.style.backgroundPosition = "center center";
+            musicVideoBackdrop.style.backgroundSize = "cover";
+            musicVideoBackdrop.style.backgroundRepeat = "no-repeat";
 
-        const player = await ensureMusicBackgroundVideoPlayer();
-        if (player) {
             const videoConfig = `${backgroundVideoId}@${backgroundVideoStart}`;
-            if (videoConfig !== lastAppliedMusicBackgroundVideoConfig) {
+            if (videoConfig !== lastAppliedMusicBackgroundVideoConfig || !musicVideoBackdrop.querySelector("iframe")) {
                 lastAppliedMusicBackgroundVideoConfig = videoConfig;
-                if (typeof player.mute === "function") player.mute();
-                if (typeof player.loadVideoById === "function") {
-                    player.loadVideoById({
-                        videoId: backgroundVideoId,
-                        startSeconds: backgroundVideoStart
-                    });
-                }
-                if (typeof player.playVideo === "function") {
-                    player.playVideo();
-                }
+                const embedUrl = `https://www.youtube.com/embed/${backgroundVideoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${backgroundVideoId}&start=${Math.floor(backgroundVideoStart)}&modestbranding=1&playsinline=1&rel=0`;
+                musicVideoBackdrop.innerHTML = `<div id="music-video-backdrop-frame"></div><iframe src="${embedUrl}" title="Music background video" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
             }
         }
 

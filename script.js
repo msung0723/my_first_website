@@ -4383,7 +4383,10 @@ function openTrackBackgroundVideoModal(trackId) {
 }
 
 function requestTrackBackgroundVideo(trackId) {
-    openTrackBackgroundVideoModal(trackId);
+    if (typeof openTrackBackgroundVideoModal === "function") {
+        openTrackBackgroundVideoModal(trackId);
+        return;
+    }
 }
 
 function attachVideoPlayer(host, autoplay) {
@@ -4870,8 +4873,17 @@ async function ensureMusicBackgroundVideoPlayer() {
         return musicBackgroundVideoPlayer;
     }
 
+    let backgroundVideoHost = document.getElementById("music-video-backdrop-frame");
+    if (!backgroundVideoHost && musicVideoBackdrop) {
+        musicVideoBackdrop.innerHTML = '<div id="music-video-backdrop-frame"></div>';
+        backgroundVideoHost = document.getElementById("music-video-backdrop-frame");
+    }
+    if (backgroundVideoHost) {
+        backgroundVideoHost.innerHTML = "";
+    }
+
     musicBackgroundVideoPlayerReadyPromise = new Promise((resolve) => {
-        musicBackgroundVideoPlayer = new window.YT.Player("music-video-backdrop-frame", {
+        musicBackgroundVideoPlayer = new window.YT.Player(backgroundVideoHost || "music-video-backdrop-frame", {
             width: "100%",
             height: "100%",
             videoId: "",
@@ -7504,6 +7516,7 @@ function applyMusicTrackBackdrop() {
     const activeTrack = getTrackForMusicVisuals();
     const backgroundArt = activeTrack?.customBackgroundArt || "";
     const backgroundVideoId = activeTrack?.customBackgroundVideoId || "";
+    const backgroundVideoStart = Math.max(0, Number(activeTrack?.customBackgroundVideoStart || 0));
     const currentUser = getCurrentUser();
     const musicBackgroundOpacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
         ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
@@ -7514,15 +7527,17 @@ function applyMusicTrackBackdrop() {
         ? pendingBackgroundImage
         : (currentUser?.backgroundImage || "");
     const applyHeaderWallpaper = Boolean(applyHeaderWallpaperInput?.checked || currentUser?.applyHeaderWallpaper);
-    const backdropKey = backgroundVideoId ? `video:${backgroundVideoId}` : (backgroundArt ? `image:${backgroundArt}` : "");
+    const backdropKey = backgroundVideoId
+        ? `video:${backgroundVideoId}@${backgroundVideoStart}`
+        : (backgroundArt ? `image:${backgroundArt}` : "");
 
     const hideVideoBackdrop = () => {
         if (musicVideoBackdrop) {
             musicVideoBackdrop.classList.add("hidden");
             musicVideoBackdrop.style.opacity = "0";
         }
-        if (musicVideoBackdropFrame && musicVideoBackdropFrame.src) {
-            musicVideoBackdropFrame.src = "";
+        if (musicVideoBackdropFrame) {
+            musicVideoBackdropFrame.innerHTML = "";
         }
     };
 
@@ -7546,18 +7561,34 @@ function applyMusicTrackBackdrop() {
         musicPage.classList.remove("has-track-background");
         musicPage.style.setProperty("--music-track-bg-url", "none");
 
+        if (!isMusicPageVisible) {
+            hideVideoBackdrop();
+            return;
+        }
+
         if (musicVideoBackdrop) {
             musicVideoBackdrop.classList.remove("hidden");
             musicVideoBackdrop.style.opacity = String(musicBackgroundOpacity);
         }
         if (musicVideoBackdropFrame) {
-            const embedUrl = `https://www.youtube.com/embed/${backgroundVideoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${backgroundVideoId}&modestbranding=1&playsinline=1&rel=0`;
-            if (musicVideoBackdropFrame.src !== embedUrl) {
-                musicVideoBackdropFrame.src = embedUrl;
+            const embedUrl = `https://www.youtube.com/embed/${backgroundVideoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${backgroundVideoId}&start=${Math.floor(backgroundVideoStart)}&modestbranding=1&playsinline=1&rel=0&enablejsapi=1`;
+            const currentIframe = musicVideoBackdropFrame.querySelector("iframe");
+            if (!currentIframe || currentIframe.src !== embedUrl) {
+                musicVideoBackdropFrame.innerHTML = `<iframe src="${embedUrl}" title="Music background video" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
             }
         }
 
-        if (isMusicPageVisible) {
+        if (applyMusicHeaderWallpaper) {
+            pageHeader.style.setProperty("background-color", "#ffffff", "important");
+            pageHeader.style.setProperty(
+                "background-image",
+                `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(https://i.ytimg.com/vi/${backgroundVideoId}/hqdefault.jpg)`,
+                "important"
+            );
+            pageHeader.style.setProperty("background-position", "center top", "important");
+            pageHeader.style.setProperty("background-size", "cover", "important");
+            pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+        } else {
             applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
         }
     } else {
@@ -7700,10 +7731,133 @@ function renderLibraryPicker() {
             backgroundBtn,
             backgroundVideoBtn,
             clearBackgroundBtn,
-            addBtn,
-            deleteBtn
-        );
-        row.append(meta, actions);
-        libraryPickerList.appendChild(row);
+        addBtn,
+        deleteBtn
+    );
+    row.append(meta, actions);
+    libraryPickerList.appendChild(row);
     });
 }
+
+requestTrackBackgroundVideo = function(trackId) {
+    if (typeof openTrackBackgroundVideoModal === "function") {
+        openTrackBackgroundVideoModal(trackId);
+    }
+};
+
+applyMusicTrackBackdrop = async function() {
+    const musicPage = document.getElementById("music-page");
+    if (!musicPage) return;
+    const isMusicPageVisible = !musicPage.classList.contains("hidden");
+
+    const activeTrack = getTrackForMusicVisuals();
+    const backgroundArt = activeTrack?.customBackgroundArt || "";
+    const backgroundVideoId = activeTrack?.customBackgroundVideoId || "";
+    const backgroundVideoStart = Math.max(0, Number(activeTrack?.customBackgroundVideoStart || 0));
+    const currentUser = getCurrentUser();
+    const musicBackgroundOpacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
+        ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
+        : Math.min(1, Math.max(0, Number(musicBackgroundOpacityInput?.value || 100) / 100));
+    const applyMusicHeaderWallpaper = currentUser?.applyMusicHeaderWallpaper !== false
+        && Boolean(applyMusicHeaderWallpaperInput?.checked ?? true);
+    const wallpaperImage = pendingBackgroundImage !== null
+        ? pendingBackgroundImage
+        : (currentUser?.backgroundImage || "");
+    const applyHeaderWallpaper = Boolean(applyHeaderWallpaperInput?.checked || currentUser?.applyHeaderWallpaper);
+    const backdropKey = backgroundVideoId
+        ? `video:${backgroundVideoId}@${backgroundVideoStart}`
+        : (backgroundArt ? `image:${backgroundArt}` : "");
+
+    if (!backgroundArt && !backgroundVideoId) {
+        lastAppliedMusicBackground = "";
+        musicPage.classList.remove("has-track-background", "track-backdrop-refresh");
+        musicPage.style.setProperty("--music-track-bg-url", "none");
+        musicPage.style.setProperty("--music-track-bg-opacity", "0");
+        stopMusicBackgroundVideoPlayback();
+        if (musicVideoBackdropFrame) {
+            musicVideoBackdropFrame.innerHTML = "";
+        }
+        if (isMusicPageVisible) {
+            applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        }
+        return;
+    }
+
+    const hasChanged = backdropKey !== lastAppliedMusicBackground;
+    lastAppliedMusicBackground = backdropKey;
+    musicPage.style.setProperty("--music-track-bg-opacity", String(musicBackgroundOpacity));
+
+    if (backgroundVideoId) {
+        musicPage.classList.remove("has-track-background");
+        musicPage.style.setProperty("--music-track-bg-url", "none");
+
+        if (!isMusicPageVisible) {
+            stopMusicBackgroundVideoPlayback();
+            return;
+        }
+
+        if (musicVideoBackdrop) {
+            musicVideoBackdrop.classList.remove("hidden");
+            musicVideoBackdrop.style.opacity = String(musicBackgroundOpacity);
+        }
+
+        const player = await ensureMusicBackgroundVideoPlayer();
+        if (player) {
+            const videoConfig = `${backgroundVideoId}@${backgroundVideoStart}`;
+            if (videoConfig !== lastAppliedMusicBackgroundVideoConfig) {
+                lastAppliedMusicBackgroundVideoConfig = videoConfig;
+                if (typeof player.mute === "function") player.mute();
+                if (typeof player.loadVideoById === "function") {
+                    player.loadVideoById({
+                        videoId: backgroundVideoId,
+                        startSeconds: backgroundVideoStart
+                    });
+                }
+                if (typeof player.playVideo === "function") {
+                    player.playVideo();
+                }
+            }
+        }
+
+        if (applyMusicHeaderWallpaper) {
+            pageHeader.style.setProperty("background-color", "#ffffff", "important");
+            pageHeader.style.setProperty(
+                "background-image",
+                `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(https://i.ytimg.com/vi/${backgroundVideoId}/hqdefault.jpg)`,
+                "important"
+            );
+            pageHeader.style.setProperty("background-position", "center top", "important");
+            pageHeader.style.setProperty("background-size", "cover", "important");
+            pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+        } else {
+            applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        }
+    } else {
+        stopMusicBackgroundVideoPlayback();
+        if (musicVideoBackdropFrame) {
+            musicVideoBackdropFrame.innerHTML = "";
+        }
+        musicPage.classList.add("has-track-background");
+        musicPage.style.setProperty("--music-track-bg-url", `url("${backgroundArt}")`);
+
+        if (isMusicPageVisible && applyMusicHeaderWallpaper) {
+            pageHeader.style.setProperty("background-color", "#ffffff", "important");
+            pageHeader.style.setProperty(
+                "background-image",
+                `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(${backgroundArt})`,
+                "important"
+            );
+            pageHeader.style.setProperty("background-position", "center top", "important");
+            pageHeader.style.setProperty("background-size", "cover", "important");
+            pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+        } else if (isMusicPageVisible) {
+            applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        }
+    }
+
+    if (hasChanged) {
+        musicPage.classList.remove("track-backdrop-refresh");
+        void musicPage.offsetWidth;
+        musicPage.classList.add("track-backdrop-refresh");
+    }
+};

@@ -419,6 +419,15 @@
     </section>
 
     <section id="music-page" class="hidden">
+        <div id="music-video-backdrop" class="music-video-backdrop hidden">
+            <iframe
+                id="music-video-backdrop-frame"
+                src=""
+                title="Music background video"
+                allow="autoplay; encrypted-media; picture-in-picture"
+                referrerpolicy="strict-origin-when-cross-origin">
+            </iframe>
+        </div>
         <div class="music-layout">
             <div class="music-center">
                 <span class="now-playing-label">Now Playing</span>
@@ -640,6 +649,9 @@
                 </div>
             </div>
             <div class="mini-video-body" id="video-player-mini-host"></div>
+            <div class="mini-video-resize-edge mini-video-resize-right" data-resize-dir="right" aria-hidden="true"></div>
+            <div class="mini-video-resize-edge mini-video-resize-bottom" data-resize-dir="bottom" aria-hidden="true"></div>
+            <div class="mini-video-resize-edge mini-video-resize-corner" data-resize-dir="corner" aria-hidden="true"></div>
             <button id="mini-video-resize-handle" class="mini-video-resize-handle" type="button" aria-label="작은 화면 크기 조절">
                 <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
             </button>

@@ -102,6 +102,8 @@ const playlistItemsEl = document.getElementById("playlist-items");
 const recordDisc = document.getElementById("record-disc");
 const recordHint = document.getElementById("record-hint");
 const nowPlayingTitle = document.getElementById("now-playing-title");
+const musicVideoBackdrop = document.getElementById("music-video-backdrop");
+const musicVideoBackdropFrame = document.getElementById("music-video-backdrop-frame");
 const transportToggleBtn = document.getElementById("transport-toggle");
 const transportToggleIcon = document.getElementById("transport-toggle-icon");
 const playbackCurrentTime = document.getElementById("playback-current-time");
@@ -237,6 +239,7 @@ const miniVideoTitle = document.getElementById("mini-video-title");
 const miniVideoOpenBtn = document.getElementById("mini-video-open-btn");
 const miniVideoCloseBtn = document.getElementById("mini-video-close-btn");
 const miniVideoResizeHandle = document.getElementById("mini-video-resize-handle");
+const miniVideoResizeEdges = document.querySelectorAll(".mini-video-resize-edge");
 
 const youtubePlayerHost = document.getElementById("youtube-player-host");
 
@@ -1580,6 +1583,7 @@ function normalizeTrackData(track = {}) {
         recordStyle: "classic",
         customRecordArt: "",
         customBackgroundArt: "",
+        customBackgroundVideoId: "",
         rotateRecord: true,
         ...track
     };
@@ -4430,44 +4434,50 @@ function initDraggablePanels() {
 }
 
 function initMiniVideoResizeHandle() {
-    if (!miniVideoResizeHandle || !miniVideoPlayer) return;
+    if (!miniVideoPlayer) return;
 
-    if (getComputedStyle(miniVideoPlayer).resize !== "none") {
-        return;
-    }
+    miniVideoResizeEdges.forEach((edge) => {
+        edge.addEventListener("pointerdown", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
 
-    miniVideoResizeHandle.addEventListener("pointerdown", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
+            const rect = miniVideoPlayer.getBoundingClientRect();
+            activeMiniVideoResize = {
+                pointerId: event.pointerId,
+                dir: edge.dataset.resizeDir || "corner",
+                startX: event.clientX,
+                startY: event.clientY,
+                startWidth: rect.width,
+                startHeight: rect.height
+            };
 
-        const rect = miniVideoPlayer.getBoundingClientRect();
-        activeMiniVideoResize = {
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startY: event.clientY,
-            startWidth: rect.width,
-            startHeight: rect.height
+            edge.setPointerCapture(event.pointerId);
+        });
+
+        edge.addEventListener("pointermove", (event) => {
+            if (!activeMiniVideoResize || activeMiniVideoResize.pointerId !== event.pointerId) return;
+
+            const dx = event.clientX - activeMiniVideoResize.startX;
+            const dy = event.clientY - activeMiniVideoResize.startY;
+            const nextWidth = activeMiniVideoResize.dir === "bottom"
+                ? activeMiniVideoResize.startWidth
+                : Math.max(260, activeMiniVideoResize.startWidth + dx);
+            const nextHeight = activeMiniVideoResize.dir === "right"
+                ? activeMiniVideoResize.startHeight
+                : Math.max(180, activeMiniVideoResize.startHeight + dy);
+
+            miniVideoPlayer.style.width = `${nextWidth}px`;
+            miniVideoPlayer.style.height = `${nextHeight}px`;
+            refreshVideoFrameLayout();
+        });
+
+        const stopResize = () => {
+            activeMiniVideoResize = null;
         };
 
-        miniVideoResizeHandle.setPointerCapture(event.pointerId);
+        edge.addEventListener("pointerup", stopResize);
+        edge.addEventListener("pointercancel", stopResize);
     });
-
-    miniVideoResizeHandle.addEventListener("pointermove", (event) => {
-        if (!activeMiniVideoResize || activeMiniVideoResize.pointerId !== event.pointerId) return;
-
-        const nextWidth = Math.max(260, activeMiniVideoResize.startWidth + (event.clientX - activeMiniVideoResize.startX));
-        const nextHeight = Math.max(180, activeMiniVideoResize.startHeight + (event.clientY - activeMiniVideoResize.startY));
-        miniVideoPlayer.style.width = `${nextWidth}px`;
-        miniVideoPlayer.style.height = `${nextHeight}px`;
-        refreshVideoFrameLayout();
-    });
-
-    const stopResize = () => {
-        activeMiniVideoResize = null;
-    };
-
-    miniVideoResizeHandle.addEventListener("pointerup", stopResize);
-    miniVideoResizeHandle.addEventListener("pointercancel", stopResize);
 }
 
 function requestTrackArtUpload(trackId) {
@@ -4511,6 +4521,38 @@ function requestTrackBackgroundUpload(trackId) {
     trackBackgroundInput.click();
 }
 
+function requestTrackBackgroundVideo(trackId) {
+    const track = getTrackById(trackId);
+    if (!track) return;
+
+    const currentUrl = track.customBackgroundVideoId
+        ? `https://www.youtube.com/watch?v=${track.customBackgroundVideoId}`
+        : "";
+    const input = prompt("배경으로 사용할 유튜브 링크를 입력해 주세요.", currentUrl);
+    if (input === null) return;
+
+    const trimmed = input.trim();
+    if (!trimmed) {
+        track.customBackgroundVideoId = "";
+        saveMusicState();
+        renderMusicUI();
+        renderLibraryPickerIfVisible();
+        return;
+    }
+
+    const youtubeId = extractYouTubeId(trimmed);
+    if (!youtubeId) {
+        alert("올바른 유튜브 링크를 입력해 주세요.");
+        return;
+    }
+
+    track.customBackgroundVideoId = youtubeId;
+    track.customBackgroundArt = "";
+    saveMusicState();
+    renderMusicUI();
+    renderLibraryPickerIfVisible();
+}
+
 function handleTrackBackgroundUpload(event) {
     const file = event.target.files?.[0];
     const targetTrack = getTrackById(pendingTrackBackgroundTargetId);
@@ -4523,10 +4565,13 @@ function handleTrackBackgroundUpload(event) {
     const reader = new FileReader();
     reader.onload = () => {
         const previousArt = targetTrack.customBackgroundArt || "";
+        const previousVideoId = targetTrack.customBackgroundVideoId || "";
         targetTrack.customBackgroundArt = String(reader.result || "");
+        targetTrack.customBackgroundVideoId = "";
 
         if (!saveMusicState()) {
             targetTrack.customBackgroundArt = previousArt;
+            targetTrack.customBackgroundVideoId = previousVideoId;
             alert("배경 이미지 저장에 실패했습니다. 파일 크기를 줄이거나 브라우저 저장 공간을 확인해주세요.");
             return;
         }
@@ -4698,6 +4743,7 @@ function applyMusicTrackBackdrop() {
 
     const activeTrack = getTrackForMusicVisuals();
     const backgroundArt = activeTrack?.customBackgroundArt || "";
+    const backgroundVideoId = activeTrack?.customBackgroundVideoId || "";
     const currentUser = getCurrentUser();
     const musicBackgroundOpacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
         ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
@@ -4708,34 +4754,70 @@ function applyMusicTrackBackdrop() {
         ? pendingBackgroundImage
         : (currentUser?.backgroundImage || "");
     const applyHeaderWallpaper = Boolean(applyHeaderWallpaperInput?.checked || currentUser?.applyHeaderWallpaper);
+    const activeBackdropKey = backgroundVideoId ? `video:${backgroundVideoId}` : (backgroundArt ? `image:${backgroundArt}` : "");
 
-    if (!backgroundArt) {
+    if (!backgroundArt && !backgroundVideoId) {
         lastAppliedMusicBackground = "";
         musicPage.classList.remove("has-track-background", "track-backdrop-refresh");
         musicPage.style.setProperty("--music-track-bg-url", "none");
+        musicPage.style.setProperty("--music-track-bg-opacity", "0");
+        musicVideoBackdrop?.classList.add("hidden");
+        if (musicVideoBackdrop) {
+            musicVideoBackdrop.style.opacity = "0";
+        }
+        if (musicVideoBackdropFrame && musicVideoBackdropFrame.src) {
+            musicVideoBackdropFrame.src = "";
+        }
         if (isMusicPageVisible) {
             applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
         }
         return;
     }
 
-    const hasChanged = backgroundArt !== lastAppliedMusicBackground;
-    lastAppliedMusicBackground = backgroundArt;
-    musicPage.classList.add("has-track-background");
-    musicPage.style.setProperty("--music-track-bg-url", `url("${backgroundArt}")`);
+    const hasChanged = activeBackdropKey !== lastAppliedMusicBackground;
+    lastAppliedMusicBackground = activeBackdropKey;
     musicPage.style.setProperty("--music-track-bg-opacity", String(musicBackgroundOpacity));
-    if (isMusicPageVisible && applyMusicHeaderWallpaper) {
-        pageHeader.style.setProperty("background-color", "#ffffff", "important");
-        pageHeader.style.setProperty(
-            "background-image",
-            `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(${backgroundArt})`,
-            "important"
-        );
-        pageHeader.style.setProperty("background-position", "center top", "important");
-        pageHeader.style.setProperty("background-size", "cover", "important");
-        pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
-    } else if (isMusicPageVisible) {
-        applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+
+    if (backgroundVideoId) {
+        musicPage.classList.remove("has-track-background");
+        musicPage.style.setProperty("--music-track-bg-url", "none");
+        if (musicVideoBackdrop) {
+            musicVideoBackdrop.classList.remove("hidden");
+            musicVideoBackdrop.style.opacity = String(musicBackgroundOpacity);
+        }
+        if (musicVideoBackdropFrame) {
+            const embedUrl = `https://www.youtube.com/embed/${backgroundVideoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${backgroundVideoId}&modestbranding=1&playsinline=1&rel=0`;
+            if (musicVideoBackdropFrame.src !== embedUrl) {
+                musicVideoBackdropFrame.src = embedUrl;
+            }
+        }
+        if (isMusicPageVisible) {
+            applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        }
+    } else {
+        musicVideoBackdrop?.classList.add("hidden");
+        if (musicVideoBackdrop) {
+            musicVideoBackdrop.style.opacity = "0";
+        }
+        if (musicVideoBackdropFrame && musicVideoBackdropFrame.src) {
+            musicVideoBackdropFrame.src = "";
+        }
+
+        musicPage.classList.add("has-track-background");
+        musicPage.style.setProperty("--music-track-bg-url", `url("${backgroundArt}")`);
+        if (isMusicPageVisible && applyMusicHeaderWallpaper) {
+            pageHeader.style.setProperty("background-color", "#ffffff", "important");
+            pageHeader.style.setProperty(
+                "background-image",
+                `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(${backgroundArt})`,
+                "important"
+            );
+            pageHeader.style.setProperty("background-position", "center top", "important");
+            pageHeader.style.setProperty("background-size", "cover", "important");
+            pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+        } else if (isMusicPageVisible) {
+            applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        }
     }
 
     if (hasChanged) {
@@ -4758,6 +4840,7 @@ function clearTrackBackgroundArt(trackId) {
     const track = getTrackById(trackId);
     if (!track) return;
     track.customBackgroundArt = "";
+    track.customBackgroundVideoId = "";
     saveMusicState();
     renderMusicUI();
     renderLibraryPickerIfVisible();
@@ -5522,4 +5605,255 @@ function escapeHtml(value) {
 
 function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
+}
+
+function handleTrackBackgroundUpload(event) {
+    const file = event.target.files?.[0];
+    const targetTrack = getTrackById(pendingTrackBackgroundTargetId);
+    if (!file || !targetTrack) return;
+    if (file.size > MAX_TRACK_BACKGROUND_SIZE) {
+        alert("배경 이미지는 4MB 이하만 업로드할 수 있습니다.");
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+        const previousArt = targetTrack.customBackgroundArt || "";
+        const previousVideoId = targetTrack.customBackgroundVideoId || "";
+        targetTrack.customBackgroundArt = String(reader.result || "");
+        targetTrack.customBackgroundVideoId = "";
+
+        if (!saveMusicState()) {
+            targetTrack.customBackgroundArt = previousArt;
+            targetTrack.customBackgroundVideoId = previousVideoId;
+            alert("배경 이미지 저장에 실패했습니다. 파일 크기를 줄이거나 브라우저 저장 공간을 확인해 주세요.");
+            return;
+        }
+
+        renderMusicUI();
+        renderLibraryPickerIfVisible();
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearTrackBackgroundArt(trackId) {
+    const track = getTrackById(trackId);
+    if (!track) return;
+    track.customBackgroundArt = "";
+    track.customBackgroundVideoId = "";
+    saveMusicState();
+    renderMusicUI();
+    renderLibraryPickerIfVisible();
+}
+
+function applyMusicTrackBackdrop() {
+    const musicPage = document.getElementById("music-page");
+    if (!musicPage) return;
+    const isMusicPageVisible = !musicPage.classList.contains("hidden");
+
+    const activeTrack = getTrackForMusicVisuals();
+    const backgroundArt = activeTrack?.customBackgroundArt || "";
+    const backgroundVideoId = activeTrack?.customBackgroundVideoId || "";
+    const currentUser = getCurrentUser();
+    const musicBackgroundOpacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
+        ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
+        : Math.min(1, Math.max(0, Number(musicBackgroundOpacityInput?.value || 100) / 100));
+    const applyMusicHeaderWallpaper = currentUser?.applyMusicHeaderWallpaper !== false
+        && Boolean(applyMusicHeaderWallpaperInput?.checked ?? true);
+    const wallpaperImage = pendingBackgroundImage !== null
+        ? pendingBackgroundImage
+        : (currentUser?.backgroundImage || "");
+    const applyHeaderWallpaper = Boolean(applyHeaderWallpaperInput?.checked || currentUser?.applyHeaderWallpaper);
+    const backdropKey = backgroundVideoId ? `video:${backgroundVideoId}` : (backgroundArt ? `image:${backgroundArt}` : "");
+
+    const hideVideoBackdrop = () => {
+        if (musicVideoBackdrop) {
+            musicVideoBackdrop.classList.add("hidden");
+            musicVideoBackdrop.style.opacity = "0";
+        }
+        if (musicVideoBackdropFrame && musicVideoBackdropFrame.src) {
+            musicVideoBackdropFrame.src = "";
+        }
+    };
+
+    if (!backgroundArt && !backgroundVideoId) {
+        lastAppliedMusicBackground = "";
+        musicPage.classList.remove("has-track-background", "track-backdrop-refresh");
+        musicPage.style.setProperty("--music-track-bg-url", "none");
+        musicPage.style.setProperty("--music-track-bg-opacity", "0");
+        hideVideoBackdrop();
+        if (isMusicPageVisible) {
+            applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        }
+        return;
+    }
+
+    const hasChanged = backdropKey !== lastAppliedMusicBackground;
+    lastAppliedMusicBackground = backdropKey;
+    musicPage.style.setProperty("--music-track-bg-opacity", String(musicBackgroundOpacity));
+
+    if (backgroundVideoId) {
+        musicPage.classList.remove("has-track-background");
+        musicPage.style.setProperty("--music-track-bg-url", "none");
+
+        if (musicVideoBackdrop) {
+            musicVideoBackdrop.classList.remove("hidden");
+            musicVideoBackdrop.style.opacity = String(musicBackgroundOpacity);
+        }
+        if (musicVideoBackdropFrame) {
+            const embedUrl = `https://www.youtube.com/embed/${backgroundVideoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${backgroundVideoId}&modestbranding=1&playsinline=1&rel=0`;
+            if (musicVideoBackdropFrame.src !== embedUrl) {
+                musicVideoBackdropFrame.src = embedUrl;
+            }
+        }
+
+        if (isMusicPageVisible) {
+            applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        }
+    } else {
+        hideVideoBackdrop();
+        musicPage.classList.add("has-track-background");
+        musicPage.style.setProperty("--music-track-bg-url", `url("${backgroundArt}")`);
+
+        if (isMusicPageVisible && applyMusicHeaderWallpaper) {
+            pageHeader.style.setProperty("background-color", "#ffffff", "important");
+            pageHeader.style.setProperty(
+                "background-image",
+                `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(${backgroundArt})`,
+                "important"
+            );
+            pageHeader.style.setProperty("background-position", "center top", "important");
+            pageHeader.style.setProperty("background-size", "cover", "important");
+            pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+        } else if (isMusicPageVisible) {
+            applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        }
+    }
+
+    if (hasChanged) {
+        musicPage.classList.remove("track-backdrop-refresh");
+        void musicPage.offsetWidth;
+        musicPage.classList.add("track-backdrop-refresh");
+    }
+}
+
+function renderLibraryPicker() {
+    const playlist = getCurrentPlaylist();
+    const activeVisualTrack = getTrackForMusicVisuals();
+    const activeTrackId = activeVisualTrack?.id || null;
+    libraryPickerList.innerHTML = "";
+
+    if (!musicState.library.length) {
+        const empty = document.createElement("div");
+        empty.className = "playlist-edit-subtitle";
+        empty.textContent = "보관함에 추가된 노래가 아직 없습니다.";
+        libraryPickerList.appendChild(empty);
+        return;
+    }
+
+    musicState.library.forEach((track) => {
+        const row = document.createElement("div");
+        row.className = "library-picker-item";
+
+        const recordStatus = track.customRecordArt
+            ? (activeTrackId === track.id ? "현재 음반 이미지 사용 중" : "음반 이미지 설정됨")
+            : "음반 이미지 없음";
+        const backgroundStatus = track.customBackgroundVideoId
+            ? (activeTrackId === track.id ? "현재 배경 영상 사용 중" : "배경 영상 설정됨")
+            : track.customBackgroundArt
+                ? (activeTrackId === track.id ? "현재 배경 사용 중" : "배경 이미지 설정됨")
+                : "배경 없음";
+
+        const meta = document.createElement("div");
+        meta.className = "playlist-edit-meta";
+        meta.innerHTML = `
+            <div class="playlist-edit-title">${track.name}</div>
+            <div class="library-picker-type">${track.sourceType === "youtube" ? "유튜브 링크" : "mp3 파일"}</div>
+            <div class="playlist-edit-subtitle">${recordStatus}</div>
+            <div class="playlist-edit-subtitle">${backgroundStatus}</div>
+        `;
+
+        const actions = document.createElement("div");
+        actions.className = "library-picker-actions";
+
+        const renameBtn = document.createElement("button");
+        renameBtn.type = "button";
+        renameBtn.className = "mini-btn";
+        renameBtn.title = "노래 이름 수정";
+        renameBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
+        renameBtn.onclick = () => renameTrackInLibrary(track.id);
+
+        const rotateBtn = document.createElement("button");
+        rotateBtn.type = "button";
+        rotateBtn.className = "mini-btn";
+        rotateBtn.title = "음반 회전 켜기 또는 끄기";
+        rotateBtn.innerHTML = `<i class="fa-solid ${track.rotateRecord === false ? "fa-circle-stop" : "fa-rotate"}"></i>`;
+        rotateBtn.onclick = () => toggleTrackRotation(track.id);
+
+        const artBtn = document.createElement("button");
+        artBtn.type = "button";
+        artBtn.className = "mini-btn";
+        artBtn.title = "곡 전용 음반 이미지 설정";
+        artBtn.innerHTML = '<i class="fa-solid fa-compact-disc"></i>';
+        artBtn.onclick = () => requestTrackArtUpload(track.id);
+
+        const clearArtBtn = document.createElement("button");
+        clearArtBtn.type = "button";
+        clearArtBtn.className = "mini-btn";
+        clearArtBtn.title = "음반 이미지 삭제";
+        clearArtBtn.innerHTML = '<i class="fa-solid fa-eraser"></i>';
+        clearArtBtn.disabled = !track.customRecordArt;
+        clearArtBtn.onclick = () => clearTrackRecordArt(track.id);
+
+        const backgroundBtn = document.createElement("button");
+        backgroundBtn.type = "button";
+        backgroundBtn.className = "mini-btn";
+        backgroundBtn.title = "곡 전용 배경 이미지 설정";
+        backgroundBtn.innerHTML = '<i class="fa-solid fa-image"></i>';
+        backgroundBtn.onclick = () => requestTrackBackgroundUpload(track.id);
+
+        const backgroundVideoBtn = document.createElement("button");
+        backgroundVideoBtn.type = "button";
+        backgroundVideoBtn.className = "mini-btn";
+        backgroundVideoBtn.title = "곡 전용 배경 영상 설정";
+        backgroundVideoBtn.innerHTML = '<i class="fa-brands fa-youtube"></i>';
+        backgroundVideoBtn.onclick = () => requestTrackBackgroundVideo(track.id);
+
+        const clearBackgroundBtn = document.createElement("button");
+        clearBackgroundBtn.type = "button";
+        clearBackgroundBtn.className = "mini-btn";
+        clearBackgroundBtn.title = "배경 삭제";
+        clearBackgroundBtn.innerHTML = '<i class="fa-solid fa-trash-can-arrow-up"></i>';
+        clearBackgroundBtn.disabled = !track.customBackgroundArt && !track.customBackgroundVideoId;
+        clearBackgroundBtn.onclick = () => clearTrackBackgroundArt(track.id);
+
+        const addBtn = document.createElement("button");
+        addBtn.type = "button";
+        addBtn.className = "nav-btn";
+        const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
+        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
+        addBtn.disabled = alreadyAdded;
+        addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "mini-btn";
+        deleteBtn.title = "보관함에서 영구 삭제";
+        deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+        deleteBtn.onclick = () => deleteTrackFromLibrary(track.id);
+
+        actions.append(
+            renameBtn,
+            rotateBtn,
+            artBtn,
+            clearArtBtn,
+            backgroundBtn,
+            backgroundVideoBtn,
+            clearBackgroundBtn,
+            addBtn,
+            deleteBtn
+        );
+        row.append(meta, actions);
+        libraryPickerList.appendChild(row);
+    });
 }

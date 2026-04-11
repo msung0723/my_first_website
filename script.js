@@ -2613,7 +2613,7 @@ function bindMusicEvents() {
     musicAudio.addEventListener("loadedmetadata", () => updatePlaybackProgressUi());
     musicAudio.addEventListener("timeupdate", () => {
         updatePlaybackProgressUi();
-        // 재생 중 자연스러운 drift 보정 (0.5초 이상 차이날 때)
+        // 재생 중 자연스러운 drift 보정
         if (!musicAudio.paused && !musicAudio.ended) {
             syncMusicBackgroundVideoTime();
         }
@@ -5085,7 +5085,19 @@ async function applyMusicTrackBackdrop() {
     }
 }
 
-// 음악 재생 시간과 배경 영상 시간을 동기화하는 함수 (drift 보정용, 0.5초 threshold)
+// 현재 재생 중인 음악의 currentTime을 반환 (youtube / audio 모두 지원)
+function getMusicCurrentTime() {
+    const playingTrack = getTrackById(musicState.playingTrackId);
+    if (!playingTrack) return 0;
+    if (playingTrack.sourceType === "youtube") {
+        if (!youtubePlayer || typeof youtubePlayer.getCurrentTime !== "function") return 0;
+        const t = youtubePlayer.getCurrentTime();
+        return Number.isFinite(t) ? t : 0;
+    }
+    return Number.isFinite(musicAudio.currentTime) ? musicAudio.currentTime : 0;
+}
+
+// 음악 재생 시간과 배경 영상 시간을 동기화하는 함수 (drift 보정용, 0.8초 threshold)
 function syncMusicBackgroundVideoTime() {
     if (!musicBackgroundVideoPlayer) return;
     if (typeof musicBackgroundVideoPlayer.getCurrentTime !== "function") return;
@@ -5095,16 +5107,14 @@ function syncMusicBackgroundVideoTime() {
     if (!activeTrack?.customBackgroundVideoId) return;
 
     const backgroundVideoStart = Math.max(0, Number(activeTrack?.customBackgroundVideoStart || 0));
-    const musicTime = Number.isFinite(musicAudio.currentTime) ? musicAudio.currentTime : 0;
+    const musicTime = getMusicCurrentTime();
     const targetVideoTime = backgroundVideoStart + musicTime;
 
     try {
         const videoCurrentTime = musicBackgroundVideoPlayer.getCurrentTime();
-        // 0.5초 이상 차이날 때만 보정 (자연스러운 재생 중 너무 잦은 seek 방지)
-        if (Math.abs(videoCurrentTime - targetVideoTime) > 0.5) {
-            if (typeof musicBackgroundVideoPlayer.seekTo === "function") {
-                musicBackgroundVideoPlayer.seekTo(targetVideoTime, true);
-            }
+        // 0.8초 이상 차이날 때만 보정 (너무 잦은 seek 방지)
+        if (Math.abs(videoCurrentTime - targetVideoTime) > 0.8) {
+            musicBackgroundVideoPlayer.seekTo(targetVideoTime, true);
         }
     } catch (e) { /* ignore */ }
 }
@@ -5119,7 +5129,7 @@ function forceSyncMusicBackgroundVideoTime() {
     if (!activeTrack?.customBackgroundVideoId) return;
 
     const backgroundVideoStart = Math.max(0, Number(activeTrack?.customBackgroundVideoStart || 0));
-    const musicTime = Number.isFinite(musicAudio.currentTime) ? musicAudio.currentTime : 0;
+    const musicTime = getMusicCurrentTime();
     const targetVideoTime = backgroundVideoStart + musicTime;
 
     try {
@@ -5455,6 +5465,20 @@ function handleYoutubeStateChange(event) {
 
     if (event.data === window.YT.PlayerState.PLAYING || event.data === window.YT.PlayerState.PAUSED) {
         syncPlaybackUi();
+        // 유튜브 소스 일시정지 시 배경 영상도 즉시 해당 시간으로 동기화 후 정지
+        if (event.data === window.YT.PlayerState.PAUSED) {
+            forceSyncMusicBackgroundVideoTime();
+            if (musicBackgroundVideoPlayer && typeof musicBackgroundVideoPlayer.pauseVideo === "function") {
+                try { musicBackgroundVideoPlayer.pauseVideo(); } catch (e) { /* ignore */ }
+            }
+        }
+        // 유튜브 소스 재생 재개 시 배경 영상도 시간 맞춰 재개
+        if (event.data === window.YT.PlayerState.PLAYING) {
+            forceSyncMusicBackgroundVideoTime();
+            if (musicBackgroundVideoPlayer && typeof musicBackgroundVideoPlayer.playVideo === "function") {
+                try { musicBackgroundVideoPlayer.playVideo(); } catch (e) { /* ignore */ }
+            }
+        }
     }
 
     if (event.data === window.YT.PlayerState.ENDED) {
@@ -5523,6 +5547,10 @@ function startPlaybackMonitor() {
     playbackMonitorInterval = setInterval(() => {
         updatePlaybackControls();
         updatePlaybackProgressUi();
+        // 유튜브 소스 음악은 timeupdate 이벤트가 없으므로 여기서 주기적으로 동기화
+        if (isPlaybackActive()) {
+            syncMusicBackgroundVideoTime();
+        }
     }, 500);
 }
 
@@ -5626,11 +5654,23 @@ function seekPlayback(nextTime) {
         if (youtubePlayer && typeof youtubePlayer.seekTo === "function") {
             youtubePlayer.seekTo(nextTime, true);
         }
+        // 유튜브 소스는 musicAudio.seeked 이벤트가 없으므로 여기서 직접 강제 동기화
+        const activeTrack = getTrackForMusicVisuals();
+        if (activeTrack?.customBackgroundVideoId && musicBackgroundVideoPlayer) {
+            const backgroundVideoStart = Math.max(0, Number(activeTrack?.customBackgroundVideoStart || 0));
+            const targetVideoTime = backgroundVideoStart + nextTime;
+            try {
+                if (typeof musicBackgroundVideoPlayer.seekTo === "function") {
+                    musicBackgroundVideoPlayer.seekTo(targetVideoTime, true);
+                }
+            } catch (e) { /* ignore */ }
+        }
         return;
     }
 
     if (musicAudio.src) {
         musicAudio.currentTime = nextTime;
+        // musicAudio.seeked 이벤트가 발생하면 forceSyncMusicBackgroundVideoTime이 호출됨
     }
 }
 

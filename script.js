@@ -2175,6 +2175,9 @@ function showPage(pageId) {
     if (pageId === "video-page") {
         renderVideoUI();
     }
+    if (videoState.currentVideoId && videoState.isMiniPlayer) {
+        requestAnimationFrame(() => refreshVideoFrameLayout());
+    }
 }
 
 function handleSignup() {
@@ -4427,6 +4430,10 @@ function initDraggablePanels() {
 
 function initMiniVideoResizeHandle() {
     if (!miniVideoResizeHandle || !miniVideoPlayer) return;
+
+    if (getComputedStyle(miniVideoPlayer).resize !== "none") {
+        return;
+    }
 
     miniVideoResizeHandle.addEventListener("pointerdown", (event) => {
         event.preventDefault();

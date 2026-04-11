@@ -7830,7 +7830,9 @@ stopMusicBackgroundVideoPlayback = function() {
         musicVideoBackdrop.style.backgroundPosition = "";
         musicVideoBackdrop.style.backgroundSize = "";
         musicVideoBackdrop.style.backgroundRepeat = "";
-        musicVideoBackdrop.innerHTML = '<div id="music-video-backdrop-frame"></div>';
+    }
+    if (musicBackgroundVideoPlayer && typeof musicBackgroundVideoPlayer.stopVideo === "function") {
+        try { musicBackgroundVideoPlayer.stopVideo(); } catch (e) { /* ignore */ }
     }
 };
 
@@ -7864,9 +7866,6 @@ applyMusicTrackBackdrop = async function() {
         musicPage.style.setProperty("--music-track-bg-url", "none");
         musicPage.style.setProperty("--music-track-bg-opacity", "0");
         stopMusicBackgroundVideoPlayback();
-        if (musicVideoBackdropFrame) {
-            musicVideoBackdropFrame.innerHTML = "";
-        }
         if (isMusicPageVisible) {
             applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
         }
@@ -7893,15 +7892,42 @@ applyMusicTrackBackdrop = async function() {
             musicVideoBackdrop.style.backgroundPosition = "center center";
             musicVideoBackdrop.style.backgroundSize = "cover";
             musicVideoBackdrop.style.backgroundRepeat = "no-repeat";
+        }
 
+        // YouTube IFrame API 플레이어를 사용해야 seekTo로 시간 동기화가 가능
+        const player = await ensureMusicBackgroundVideoPlayer();
+        if (player) {
             const videoConfig = `${backgroundVideoId}@${backgroundVideoStart}`;
-            if (!isTrackPlaying) {
-                lastAppliedMusicBackgroundVideoConfig = "";
-                musicVideoBackdrop.innerHTML = '<div id="music-video-backdrop-frame"></div>';
-            } else if (videoConfig !== lastAppliedMusicBackgroundVideoConfig || !musicVideoBackdrop.querySelector("iframe")) {
+            const musicTime = Number.isFinite(musicAudio.currentTime) ? musicAudio.currentTime : 0;
+            const targetStartTime = backgroundVideoStart + musicTime;
+
+            if (videoConfig !== lastAppliedMusicBackgroundVideoConfig) {
                 lastAppliedMusicBackgroundVideoConfig = videoConfig;
-                const embedUrl = `https://www.youtube.com/embed/${backgroundVideoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${backgroundVideoId}&start=${Math.floor(backgroundVideoStart)}&modestbranding=1&playsinline=1&rel=0`;
-                musicVideoBackdrop.innerHTML = `<div id="music-video-backdrop-frame"></div><iframe src="${embedUrl}" title="Music background video" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+                if (typeof player.mute === "function") player.mute();
+                if (typeof player.loadVideoById === "function") {
+                    player.loadVideoById({
+                        videoId: backgroundVideoId,
+                        startSeconds: targetStartTime
+                    });
+                }
+                if (isTrackPlaying) {
+                    if (typeof player.playVideo === "function") player.playVideo();
+                } else {
+                    // 로드 후 현재 음악 시간 위치에 정지
+                    setTimeout(() => {
+                        try {
+                            if (typeof player.seekTo === "function") player.seekTo(targetStartTime, true);
+                            if (typeof player.pauseVideo === "function") player.pauseVideo();
+                        } catch (e) { /* ignore */ }
+                    }, 400);
+                }
+            } else {
+                // 같은 영상 — 재생/정지 상태 전환
+                if (isTrackPlaying) {
+                    if (typeof player.playVideo === "function") player.playVideo();
+                } else {
+                    if (typeof player.pauseVideo === "function") player.pauseVideo();
+                }
             }
         }
 
@@ -7920,9 +7946,6 @@ applyMusicTrackBackdrop = async function() {
         }
     } else {
         stopMusicBackgroundVideoPlayback();
-        if (musicVideoBackdropFrame) {
-            musicVideoBackdropFrame.innerHTML = "";
-        }
         musicPage.classList.add("has-track-background");
         musicPage.style.setProperty("--music-track-bg-url", `url("${backgroundArt}")`);
 

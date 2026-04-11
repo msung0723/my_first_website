@@ -3323,6 +3323,136 @@ function renderLibraryPicker() {
     });
 }
 
+function openTrackBackgroundVideoModal(trackId) {
+    const track = getTrackById(trackId);
+    if (!track) return;
+
+    pendingTrackBackgroundVideoTargetId = trackId;
+    pendingTrackBackgroundVideoId = track.customBackgroundVideoId || "";
+    pendingTrackBackgroundVideoStart = Math.max(0, Number(track.customBackgroundVideoStart || 0));
+
+    if (trackBackgroundVideoUrlInput) {
+        trackBackgroundVideoUrlInput.value = pendingTrackBackgroundVideoId
+            ? `https://www.youtube.com/watch?v=${pendingTrackBackgroundVideoId}`
+            : "";
+    }
+    if (trackBackgroundVideoRange) {
+        trackBackgroundVideoRange.value = String(pendingTrackBackgroundVideoStart);
+    }
+    updateTrackBackgroundVideoStartDisplay(pendingTrackBackgroundVideoStart);
+    if (trackBackgroundVideoCurrentTime) {
+        trackBackgroundVideoCurrentTime.textContent = formatPreciseSeconds(pendingTrackBackgroundVideoStart);
+    }
+    if (trackBackgroundVideoDuration) {
+        trackBackgroundVideoDuration.textContent = "0.00s";
+    }
+
+    trackBackgroundVideoModal?.classList.remove("hidden");
+    loadTrackBackgroundVideoEditorPreview().catch((error) => {
+        console.warn("Failed to load background video preview", error);
+    });
+}
+
+function requestTrackBackgroundVideo(trackId) {
+    openTrackBackgroundVideoModal(trackId);
+}
+
+function attachVideoPlayer(host, autoplay) {
+    const currentVideo = getCurrentVideo();
+    if (!host || !currentVideo) return;
+    const src = `https://www.youtube.com/embed/${currentVideo.youtubeId}?autoplay=${autoplay ? 1 : 0}&rel=0&modestbranding=1&enablejsapi=1`;
+
+    if (videoPlayerFrame.dataset.videoId !== currentVideo.youtubeId || videoPlayerFrame.src !== src) {
+        videoPlayerFrame.src = src;
+        videoPlayerFrame.dataset.videoId = currentVideo.youtubeId;
+    }
+    if (videoPlayerFrame.parentElement !== host) {
+        host.appendChild(videoPlayerFrame);
+    }
+
+    videoPlayerFrame.classList.remove("hidden");
+    Object.assign(videoPlayerFrame.style, {
+        position: "absolute",
+        inset: "0",
+        left: "0",
+        top: "0",
+        width: "100%",
+        height: "100%",
+        zIndex: "1",
+        background: "#0b1015"
+    });
+}
+
+function positionVideoFrameOver(host) {
+    if (!host || videoPlayerFrame.classList.contains("hidden")) return;
+    if (videoPlayerFrame.parentElement !== host) {
+        host.appendChild(videoPlayerFrame);
+    }
+    Object.assign(videoPlayerFrame.style, {
+        position: "absolute",
+        inset: "0",
+        left: "0",
+        top: "0",
+        width: "100%",
+        height: "100%",
+        zIndex: "1"
+    });
+}
+
+function refreshVideoFrameLayout() {
+    const currentVideo = getCurrentVideo();
+    if (!currentVideo) return;
+    const host = videoState.isMiniPlayer ? videoPlayerMiniHost : videoPlayerMainHost;
+    if (!host) return;
+    requestAnimationFrame(() => positionVideoFrameOver(host));
+}
+
+function syncVideoViewer() {
+    const currentVideo = getCurrentVideo();
+    if (!currentVideo) {
+        videoViewer.classList.add("hidden");
+        miniVideoPlayer.classList.add("hidden");
+        videoPlayerFrame.classList.add("hidden");
+        return;
+    }
+
+    videoEditorTitle.value = currentVideo.title || "";
+    videoEditorDescription.value = currentVideo.description || "";
+    miniVideoTitle.textContent = currentVideo.title || "Video Playing";
+    renderCurrentVideoTags();
+
+    if (videoState.isMiniPlayer) {
+        miniVideoPlayer.classList.remove("hidden");
+        videoViewer.classList.add("hidden");
+        attachVideoPlayer(videoPlayerMiniHost, true);
+    } else {
+        miniVideoPlayer.classList.add("hidden");
+        videoViewer.classList.remove("hidden");
+        attachVideoPlayer(videoPlayerMainHost, true);
+    }
+}
+
+function closeVideoViewer(clearCurrent) {
+    videoPlayerFrame.src = "";
+    delete videoPlayerFrame.dataset.videoId;
+    videoPlayerFrame.classList.add("hidden");
+    Object.assign(videoPlayerFrame.style, {
+        position: "",
+        inset: "",
+        left: "",
+        top: "",
+        width: "",
+        height: "",
+        zIndex: ""
+    });
+    videoViewer.classList.add("hidden");
+    miniVideoPlayer.classList.add("hidden");
+    if (clearCurrent) {
+        videoState.currentVideoId = null;
+        videoState.isMiniPlayer = false;
+    }
+}
+
 function formatPreciseSeconds(seconds) {
     const safe = Math.max(0, Number(seconds) || 0);
     return `${safe.toFixed(2)}초`;

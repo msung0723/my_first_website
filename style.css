@@ -1207,6 +1207,7 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
     content: '';
     position: absolute;
     inset: 0;
+    z-index: 0;
     background: radial-gradient(circle, rgba(17,17,17,0.05) 0%, rgba(17,17,17,0.02) 32%, transparent 68%);
     background-size: 760px 760px;
     background-position: center;
@@ -1230,7 +1231,7 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
 .music-video-backdrop {
     position: absolute;
     inset: 0;
-    z-index: 0;
+    z-index: 1;
     opacity: var(--music-track-bg-opacity);
     pointer-events: none;
     overflow: hidden;
@@ -1263,7 +1264,7 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
     min-height: calc(100vh - 100px);
     padding: 40px 36px 50px 56px;
     position: relative;
-    z-index: 1;
+    z-index: 2;
 }
 
 .music-add-box {

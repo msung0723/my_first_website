@@ -3385,13 +3385,10 @@ function applyMusicTrackBackdrop() {
         : (backgroundArt ? `image:${backgroundArt}` : "");
 
     const hideVideoBackdrop = () => {
-        if (musicVideoBackdrop) {
-            musicVideoBackdrop.classList.add("hidden");
-            musicVideoBackdrop.style.opacity = "0";
-        }
-        if (musicVideoBackdropFrame) {
-            musicVideoBackdropFrame.innerHTML = "";
-        }
+        if (!musicVideoBackdrop) return;
+        musicVideoBackdrop.classList.add("hidden");
+        musicVideoBackdrop.style.opacity = "0";
+        musicVideoBackdrop.innerHTML = '<div id="music-video-backdrop-frame"></div>';
     };
 
     if (!backgroundArt && !backgroundVideoId) {
@@ -3424,9 +3421,9 @@ function applyMusicTrackBackdrop() {
             musicVideoBackdrop.style.opacity = String(musicBackgroundOpacity);
         }
 
-        if (musicVideoBackdropFrame && (hasChanged || !musicVideoBackdropFrame.querySelector("iframe"))) {
+        if (musicVideoBackdrop && (hasChanged || !musicVideoBackdrop.querySelector("iframe"))) {
             const embedUrl = `https://www.youtube.com/embed/${backgroundVideoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${backgroundVideoId}&start=${Math.floor(backgroundVideoStart)}&modestbranding=1&playsinline=1&rel=0`;
-            musicVideoBackdropFrame.innerHTML = `<iframe src="${embedUrl}" title="Music background video" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+            musicVideoBackdrop.innerHTML = `<iframe src="${embedUrl}" title="Music background video" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
         }
 
         applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);

@@ -326,8 +326,8 @@ let activeSizeTarget = null;
 let suppressMainEditClickUntil = 0;
 
 const RECORD_STYLE_OPTIONS = [
-    { id: "classic", label: "?대옒?? },
-    { id: "aurora", label: "?ㅻ줈?? },
+    { id: "classic", label: "클래식" },
+    { id: "aurora", label: "오로라" },
     { id: "silver", label: "?ㅻ쾭" },
     { id: "sunset", label: "?좎뀑" }
 ];
@@ -614,7 +614,7 @@ function loadSettings() {
     const musicBackgroundOpacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
         ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
         : 1;
-    const welcomeMessage = currentUser?.welcomeMessage || (currentUser ? `${currentUser.id}???섏쁺?⑸땲?? : "?꾨Т媛쒕떂 ?섏쁺?⑸땲??);
+    const welcomeMessage = currentUser?.welcomeMessage || (currentUser ? `${currentUser.id}님 환영합니다` : "익명님 환영합니다");
 
     if (currentUser) {
         document.getElementById("nav-signup-btn").classList.add("hidden");
@@ -625,7 +625,7 @@ function loadSettings() {
         document.getElementById("nav-signup-btn").classList.remove("hidden");
         document.getElementById("nav-login-btn").classList.remove("hidden");
         navProfileGroup.classList.add("hidden");
-        userNameDisplay.innerText = "?꾨Т媛쒕떂 ?섏쁺?⑸땲??;
+        userNameDisplay.innerText = "익명님 환영합니다";
     }
 
     if (currentUser?.profilePic) {
@@ -1646,7 +1646,7 @@ function stopProfileCropDragging() {
 }
 
 function getDefaultWelcomeMessage(user) {
-    return user ? `${user.id}???섏쁺?⑸땲?? : "?꾨Т媛쒕떂 ?섏쁺?⑸땲??;
+    return user ? `${user.id}님 환영합니다` : "익명님 환영합니다";
 }
 
 function getDefaultWelcomeToolState() {
@@ -2393,8 +2393,8 @@ function handleSignup() {
         profileImageHistory: [],
         backgroundImageHistory: [],
         mainPagePresets: [null, null, null],
-        welcomeMessage: `${id}???섏쁺?⑸땲??,
-        welcomeMessageHtml: escapeHtml(`${id}???섏쁺?⑸땲??),
+        welcomeMessage: `${id}님 환영합니다`,
+        welcomeMessageHtml: escapeHtml(`${id}님 환영합니다`),
         welcomeToolState: getDefaultWelcomeToolState(),
         mainPageLayout: getDefaultMainPageLayout()
     });
@@ -2870,8 +2870,8 @@ function migrateLegacyUserData() {
         profileImageHistory: [],
         backgroundImageHistory: [],
         mainPagePresets: [null, null, null],
-        welcomeMessage: `${legacyId}???섏쁺?⑸땲??,
-        welcomeMessageHtml: escapeHtml(`${legacyId}???섏쁺?⑸땲??),
+        welcomeMessage: `${legacyId}님 환영합니다`,
+        welcomeMessageHtml: escapeHtml(`${legacyId}님 환영합니다`),
         welcomeToolState: getDefaultWelcomeToolState(),
         mainPageLayout: getDefaultMainPageLayout()
     };
@@ -3382,7 +3382,7 @@ function updatePlaybackTexts() {
 
     recordHint.textContent = selectedTrack
         ? `?좏깮???뚯븙: ${selectedTrack.name}`
-        : "?ъ깮???뚯븙???좏깮?????뚮컲???뚮윭二쇱꽭??;
+        : "재생할 음악을 선택한 뒤 음반을 눌러주세요.";
 
     if (playingTrack) {
         nowPlayingTitle.textContent = `?ъ깮 以? ${playingTrack.name}`;
@@ -3442,7 +3442,7 @@ function renderPlaylistEditor() {
         const controls = document.createElement("div");
         controls.className = "playlist-edit-controls";
 
-        const upBtn = createMiniButton("??, "?꾨줈");
+        const upBtn = createMiniButton("↑", "위로");
         upBtn.disabled = index === 0;
         upBtn.onclick = () => moveTrackInsidePlaylist(index, -1);
 
@@ -3493,7 +3493,7 @@ function renderLibraryPicker() {
         addBtn.type = "button";
         addBtn.className = "nav-btn";
         const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
-        addBtn.textContent = alreadyAdded ? "異붽??? : "?ъ깮紐⑸줉??異붽?";
+        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
         addBtn.disabled = alreadyAdded;
         addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
 
@@ -4667,7 +4667,7 @@ function closeVideoViewer(clearCurrent) {
 
 function formatPreciseSeconds(seconds) {
     const safe = Math.max(0, Number(seconds) || 0);
-    return `${safe.toFixed(2)}珥?;
+    return `${safe.toFixed(2)}초`;
 }
 
 function updateTrackBackgroundVideoStartDisplay(value) {
@@ -4807,7 +4807,7 @@ async function openTrackBackgroundVideoModal(trackId) {
         trackBackgroundVideoCurrentTime.textContent = formatPreciseSeconds(pendingTrackBackgroundVideoStart);
     }
     if (trackBackgroundVideoDuration) {
-        trackBackgroundVideoDuration.textContent = "0.00珥?;
+        trackBackgroundVideoDuration.textContent = "0.00초";
     }
 
     trackBackgroundVideoModal?.classList.remove("hidden");
@@ -5797,7 +5797,7 @@ function updatePlaybackTexts() {
 
     recordHint.textContent = selectedTrack
         ? `?좏깮???뚯븙: ${selectedTrack.name}`
-        : "?ъ깮???뚯븙???좏깮?????뚮컲???뚮윭二쇱꽭??;
+        : "재생할 음악을 선택한 뒤 음반을 눌러주세요.";
 
     if (playingTrack) {
         nowPlayingTitle.textContent = `${isPaused ? "?쇱떆?뺤?:" : "?ъ깮 以?"} ${playingTrack.name}`;
@@ -6138,7 +6138,7 @@ function updatePlaybackTexts() {
 
     recordHint.textContent = selectedTrack
         ? `?좏깮???뚯븙: ${selectedTrack.name}`
-        : "?ъ깮???뚯븙???좏깮?????뚮컲???뚮윭二쇱꽭??;
+        : "재생할 음악을 선택한 뒤 음반을 눌러주세요.";
 
     if (playingTrack) {
         nowPlayingTitle.textContent = `${isPaused ? "?쇱떆?뺤?:" : "?ъ깮 以?"} ${playingTrack.name}`;
@@ -6176,7 +6176,7 @@ function renderLibraryPicker() {
         const artBtn = document.createElement("button");
         artBtn.type = "button";
         artBtn.className = "mini-btn";
-        artBtn.title = "??怨??뚮컲 ?대?吏 ?낅줈??;
+        artBtn.title = "이 곡 음반 이미지 업로드";
         artBtn.innerHTML = '<i class="fa-solid fa-compact-disc"></i>';
         artBtn.onclick = () => requestTrackArtUpload(track.id);
 
@@ -6184,7 +6184,7 @@ function renderLibraryPicker() {
         addBtn.type = "button";
         addBtn.className = "nav-btn";
         const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
-        addBtn.textContent = alreadyAdded ? "異붽??? : "?ъ깮紐⑸줉??異붽?";
+        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
         addBtn.disabled = alreadyAdded;
         addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
 
@@ -6860,7 +6860,7 @@ function renderLibraryPicker() {
         addBtn.type = "button";
         addBtn.className = "nav-btn";
         const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
-        addBtn.textContent = alreadyAdded ? "異붽??? : "?ъ깮紐⑸줉??異붽?";
+        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
         addBtn.disabled = alreadyAdded;
         addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
 
@@ -7104,7 +7104,7 @@ function renderLibraryPicker() {
         addBtn.type = "button";
         addBtn.className = "nav-btn";
         const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
-        addBtn.textContent = alreadyAdded ? "異붽??? : "?ъ깮紐⑸줉??異붽?";
+        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
         addBtn.disabled = alreadyAdded;
         addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
 
@@ -7276,7 +7276,7 @@ function renderLibraryPicker() {
         addBtn.type = "button";
         addBtn.className = "nav-btn";
         const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
-        addBtn.textContent = alreadyAdded ? "異붽??? : "?ъ깮紐⑸줉??異붽?";
+        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
         addBtn.disabled = alreadyAdded;
         addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
 
@@ -7630,7 +7630,7 @@ function syncVideoViewer() {
 
     videoEditorTitle.value = currentVideo.title || "";
     videoEditorDescription.value = currentVideo.description || "";
-    miniVideoTitle.textContent = currentVideo.title || "?곸긽 ?ъ깮 以?;
+    miniVideoTitle.textContent = currentVideo.title || "영상 재생 중";
     renderCurrentVideoTags();
 
     if (videoState.isMiniPlayer) {
@@ -7845,7 +7845,7 @@ function syncVideoViewer() {
 
     videoEditorTitle.value = currentVideo.title || "";
     videoEditorDescription.value = currentVideo.description || "";
-    miniVideoTitle.textContent = currentVideo.title || "?곸긽 ?ъ깮 以?;
+    miniVideoTitle.textContent = currentVideo.title || "영상 재생 중";
     renderCurrentVideoTags();
 
     if (videoState.isMiniPlayer) {
@@ -8056,7 +8056,7 @@ function renderLibraryPicker() {
     if (!musicState.library.length) {
         const empty = document.createElement("div");
         empty.className = "playlist-edit-subtitle";
-        empty.textContent = "蹂닿??⑥뿉 異붽????몃옒媛 ?꾩쭅 ?놁뒿?덈떎.";
+        empty.textContent = "보관함에 추가된 노래가 아직 없습니다.";
         libraryPickerList.appendChild(empty);
         return;
     }
@@ -8066,19 +8066,19 @@ function renderLibraryPicker() {
         row.className = "library-picker-item";
 
         const recordStatus = track.customRecordArt
-            ? (activeTrackId === track.id ? "?꾩옱 ?뚮컲 ?대?吏 ?ъ슜 以? : "?뚮컲 ?대?吏 ?ㅼ젙??)
-            : "?뚮컲 ?대?吏 ?놁쓬";
+            ? (activeTrackId === track.id ? "현재 음반 이미지 사용 중" : "음반 이미지 설정됨")
+            : "음반 이미지 없음";
         const backgroundStatus = track.customBackgroundVideoId
-            ? (activeTrackId === track.id ? "?꾩옱 諛곌꼍 ?곸긽 ?ъ슜 以? : "諛곌꼍 ?곸긽 ?ㅼ젙??)
+            ? (activeTrackId === track.id ? "현재 배경 영상 사용 중" : "배경 영상 설정됨")
             : track.customBackgroundArt
-                ? (activeTrackId === track.id ? "?꾩옱 諛곌꼍 ?ъ슜 以? : "諛곌꼍 ?대?吏 ?ㅼ젙??)
-                : "諛곌꼍 ?놁쓬";
+                ? (activeTrackId === track.id ? "현재 배경 사용 중" : "배경 이미지 설정됨")
+                : "배경 없음";
 
         const meta = document.createElement("div");
         meta.className = "playlist-edit-meta";
         meta.innerHTML = `
             <div class="playlist-edit-title">${track.name}</div>
-            <div class="library-picker-type">${track.sourceType === "youtube" ? "?좏뒠釉?留곹겕" : "mp3 ?뚯씪"}</div>
+            <div class="library-picker-type">${track.sourceType === "youtube" ? "유튜브 링크" : "mp3 파일"}</div>
             <div class="playlist-edit-subtitle">${recordStatus}</div>
             <div class="playlist-edit-subtitle">${backgroundStatus}</div>
         `;
@@ -8089,28 +8089,28 @@ function renderLibraryPicker() {
         const renameBtn = document.createElement("button");
         renameBtn.type = "button";
         renameBtn.className = "mini-btn";
-        renameBtn.title = "?몃옒 ?대쫫 ?섏젙";
+        renameBtn.title = "노래 이름 수정";
         renameBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
         renameBtn.onclick = () => renameTrackInLibrary(track.id);
 
         const rotateBtn = document.createElement("button");
         rotateBtn.type = "button";
         rotateBtn.className = "mini-btn";
-        rotateBtn.title = "?뚮컲 ?뚯쟾 耳쒓린 ?먮뒗 ?꾧린";
+        rotateBtn.title = "음반 회전 켜기 또는 끄기";
         rotateBtn.innerHTML = `<i class="fa-solid ${track.rotateRecord === false ? "fa-circle-stop" : "fa-rotate"}"></i>`;
         rotateBtn.onclick = () => toggleTrackRotation(track.id);
 
         const artBtn = document.createElement("button");
         artBtn.type = "button";
         artBtn.className = "mini-btn";
-        artBtn.title = "怨??꾩슜 ?뚮컲 ?대?吏 ?ㅼ젙";
+        artBtn.title = "곡 전용 음반 이미지 설정";
         artBtn.innerHTML = '<i class="fa-solid fa-compact-disc"></i>';
         artBtn.onclick = () => requestTrackArtUpload(track.id);
 
         const clearArtBtn = document.createElement("button");
         clearArtBtn.type = "button";
         clearArtBtn.className = "mini-btn";
-        clearArtBtn.title = "?뚮컲 ?대?吏 ??젣";
+        clearArtBtn.title = "음반 이미지 삭제";
         clearArtBtn.innerHTML = '<i class="fa-solid fa-eraser"></i>';
         clearArtBtn.disabled = !track.customRecordArt;
         clearArtBtn.onclick = () => clearTrackRecordArt(track.id);
@@ -8118,21 +8118,21 @@ function renderLibraryPicker() {
         const backgroundBtn = document.createElement("button");
         backgroundBtn.type = "button";
         backgroundBtn.className = "mini-btn";
-        backgroundBtn.title = "怨??꾩슜 諛곌꼍 ?대?吏 ?ㅼ젙";
+        backgroundBtn.title = "곡 전용 배경 이미지 설정";
         backgroundBtn.innerHTML = '<i class="fa-solid fa-image"></i>';
         backgroundBtn.onclick = () => requestTrackBackgroundUpload(track.id);
 
         const backgroundVideoBtn = document.createElement("button");
         backgroundVideoBtn.type = "button";
         backgroundVideoBtn.className = "mini-btn";
-        backgroundVideoBtn.title = "怨??꾩슜 諛곌꼍 ?곸긽 ?ㅼ젙";
+        backgroundVideoBtn.title = "곡 전용 배경 영상 설정";
         backgroundVideoBtn.innerHTML = '<i class="fa-brands fa-youtube"></i>';
         backgroundVideoBtn.onclick = () => requestTrackBackgroundVideo(track.id);
 
         const clearBackgroundBtn = document.createElement("button");
         clearBackgroundBtn.type = "button";
         clearBackgroundBtn.className = "mini-btn";
-        clearBackgroundBtn.title = "諛곌꼍 ??젣";
+        clearBackgroundBtn.title = "배경 삭제";
         clearBackgroundBtn.innerHTML = '<i class="fa-solid fa-trash-can-arrow-up"></i>';
         clearBackgroundBtn.disabled = !track.customBackgroundArt && !track.customBackgroundVideoId;
         clearBackgroundBtn.onclick = () => clearTrackBackgroundArt(track.id);
@@ -8141,14 +8141,14 @@ function renderLibraryPicker() {
         addBtn.type = "button";
         addBtn.className = "nav-btn";
         const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
-        addBtn.textContent = alreadyAdded ? "異붽??? : "?ъ깮紐⑸줉??異붽?";
+        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
         addBtn.disabled = alreadyAdded;
         addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
 
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
         deleteBtn.className = "mini-btn";
-        deleteBtn.title = "蹂닿??⑥뿉???곴뎄 ??젣";
+        deleteBtn.title = "보관함에서 영구 삭제";
         deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
         deleteBtn.onclick = () => deleteTrackFromLibrary(track.id);
 
@@ -8160,11 +8160,12 @@ function renderLibraryPicker() {
             backgroundBtn,
             backgroundVideoBtn,
             clearBackgroundBtn,
-        addBtn,
-        deleteBtn
-    );
-    row.append(meta, actions);
-    libraryPickerList.appendChild(row);
+            addBtn,
+            deleteBtn
+        );
+
+        row.append(meta, actions);
+        libraryPickerList.appendChild(row);
     });
 }
 

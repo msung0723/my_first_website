@@ -3540,7 +3540,7 @@ function requestTrackBackgroundVideo(trackId) {
     renderLibraryPickerIfVisible();
 }
 
-function applyMusicTrackBackdrop() {
+async function applyMusicTrackBackdrop() {
     const musicPage = document.getElementById("music-page");
     if (!musicPage) return;
     const isMusicPageVisible = !musicPage.classList.contains("hidden");
@@ -5903,7 +5903,7 @@ function handlePlaybackVolumeChange() {
     saveMusicState();
 }
 
-function applyMusicTrackBackdrop() {
+async function applyMusicTrackBackdrop() {
     const musicPage = document.getElementById("music-page");
     if (!musicPage) return;
 
@@ -6916,7 +6916,7 @@ function applyRecordAppearance() {
     applyGlobalRecordPreview();
 }
 
-function applyMusicTrackBackdrop() {
+async function applyMusicTrackBackdrop() {
     const musicPage = document.getElementById("music-page");
     if (!musicPage) return;
     const isMusicPageVisible = !musicPage.classList.contains("hidden");
@@ -7937,7 +7937,7 @@ function clearTrackBackgroundArt(trackId) {
     renderLibraryPickerIfVisible();
 }
 
-function applyMusicTrackBackdrop() {
+async function applyMusicTrackBackdrop() {
     const musicPage = document.getElementById("music-page");
     if (!musicPage) return;
     const isMusicPageVisible = !musicPage.classList.contains("hidden");
@@ -8519,6 +8519,7 @@ Promise.resolve().then(async () => {
         console.warn("Failed to stabilize IndexedDB image storage", error);
     }
 });
+
 
 
 

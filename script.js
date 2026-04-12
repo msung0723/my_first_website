@@ -1,4 +1,4 @@
-const userNameDisplay = document.getElementById("user-name");
+﻿const userNameDisplay = document.getElementById("user-name");
 const welcomeText = document.getElementById("welcome-text");
 const welcomeToolbar = document.getElementById("welcome-toolbar");
 const welcomeToolbarResetBtn = document.getElementById("welcome-toolbar-reset");
@@ -265,7 +265,8 @@ const VIDEO_LIBRARY_KEY_PREFIX = "videoLibraryV1";
 const VIDEO_TRASH_KEY_PREFIX = "videoTrashV1";
 const MUSIC_DB_NAME = "magnusMusicDB";
 const MUSIC_STORE_NAME = "tracks";
-const DEFAULT_PLAYLIST_NAME = "기본 재생목록";
+const IMAGE_ASSET_STORE_NAME = "imageAssets";
+const DEFAULT_PLAYLIST_NAME = "湲곕낯 ?ъ깮紐⑸줉";
 
 let pendingProfilePic = null;
 let pendingProfileCrop = null;
@@ -277,6 +278,11 @@ let welcomeCompositionStart = null;
 let activeAudioUrl = null;
 let musicDbPromise = null;
 let guestTrackBlobs = new Map();
+const imageAssetCache = new Map();
+const imageAssetDataCache = new Map();
+let wallpaperApplyToken = 0;
+let profileDisplayToken = 0;
+let recordAppearanceToken = 0;
 let musicAddSourceType = "youtube";
 let youtubePlayer = null;
 let youtubeApiPromise = null;
@@ -320,10 +326,10 @@ let activeSizeTarget = null;
 let suppressMainEditClickUntil = 0;
 
 const RECORD_STYLE_OPTIONS = [
-    { id: "classic", label: "클래식" },
-    { id: "aurora", label: "오로라" },
-    { id: "silver", label: "실버" },
-    { id: "sunset", label: "선셋" }
+    { id: "classic", label: "?대옒?? },
+    { id: "aurora", label: "?ㅻ줈?? },
+    { id: "silver", label: "?ㅻ쾭" },
+    { id: "sunset", label: "?좎뀑" }
 ];
 const RECORD_EFFECT_OPTIONS = [
     { id: "none" },
@@ -333,10 +339,10 @@ const RECORD_EFFECT_OPTIONS = [
     { id: "sky-glow" },
     { id: "prism" }
 ];
-const MAX_TRACK_ART_SIZE = 1024 * 1024 * 1.5;
-const MAX_TRACK_BACKGROUND_SIZE = 1024 * 1024 * 4;
-const MAX_PROFILE_IMAGE_SIZE = 1024 * 1024 * 8;
-const MAX_BACKGROUND_IMAGE_SIZE = 1024 * 1024 * 12;
+const MAX_TRACK_ART_SIZE = 1024 * 1024 * 6;
+const MAX_TRACK_BACKGROUND_SIZE = 1024 * 1024 * 16;
+const MAX_PROFILE_IMAGE_SIZE = 1024 * 1024 * 16;
+const MAX_BACKGROUND_IMAGE_SIZE = 1024 * 1024 * 24;
 
 let musicState = {
     library: [],
@@ -608,7 +614,7 @@ function loadSettings() {
     const musicBackgroundOpacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
         ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
         : 1;
-    const welcomeMessage = currentUser?.welcomeMessage || (currentUser ? `${currentUser.id}님 환영합니다` : "아무개님 환영합니다");
+    const welcomeMessage = currentUser?.welcomeMessage || (currentUser ? `${currentUser.id}???섏쁺?⑸땲?? : "?꾨Т媛쒕떂 ?섏쁺?⑸땲??);
 
     if (currentUser) {
         document.getElementById("nav-signup-btn").classList.add("hidden");
@@ -619,7 +625,7 @@ function loadSettings() {
         document.getElementById("nav-signup-btn").classList.remove("hidden");
         document.getElementById("nav-login-btn").classList.remove("hidden");
         navProfileGroup.classList.add("hidden");
-        userNameDisplay.innerText = "아무개님 환영합니다";
+        userNameDisplay.innerText = "?꾨Т媛쒕떂 ?섏쁺?⑸땲??;
     }
 
     if (currentUser?.profilePic) {
@@ -656,13 +662,119 @@ function loadSettings() {
     updateMainEditModeUI();
 }
 
-function updateProfileDisplay(picData, cropData = null) {
-    [headerProfileImg, profilePreview].forEach((img) => {
-        img.src = picData;
-        img.classList.remove("hidden");
-        applyProfileCropStyles(img, cropData);
+function isImageAssetRef(value) {
+    return typeof value === "string" && value.startsWith("idbimg:");
+}
+
+function createImageAssetRef(assetId) {
+    return assetId ? `idbimg:${assetId}` : "";
+}
+
+function getImageAssetId(value) {
+    return isImageAssetRef(value) ? value.slice("idbimg:".length) : "";
+}
+
+function isInlineImageData(value) {
+    return typeof value === "string" && value.startsWith("data:image/");
+}
+
+function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(String(event.target?.result || ""));
+        reader.onerror = () => reject(reader.error || new Error("Failed to read file"));
+        reader.readAsDataURL(file);
     });
-    [defaultAvatar, previewPlus].forEach((el) => el.classList.add("hidden"));
+}
+
+async function saveImageAsset(imageData) {
+    if (!imageData || !isInlineImageData(imageData) || !isLoggedInUser()) {
+        return imageData || "";
+    }
+
+    const cachedRef = imageAssetDataCache.get(imageData);
+    if (cachedRef) return cachedRef;
+
+    const assetId = `${getCurrentUserId() || "guest"}::img::${Date.now()}::${Math.random().toString(36).slice(2, 10)}`;
+    const db = await openMusicDb();
+
+    await new Promise((resolve, reject) => {
+        const transaction = db.transaction(IMAGE_ASSET_STORE_NAME, "readwrite");
+        const store = transaction.objectStore(IMAGE_ASSET_STORE_NAME);
+        store.put({ data: imageData, updatedAt: Date.now() }, assetId);
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+    });
+
+    const ref = createImageAssetRef(assetId);
+    imageAssetCache.set(assetId, imageData);
+    imageAssetDataCache.set(imageData, ref);
+    return ref;
+}
+
+async function resolveImageAsset(imageValue) {
+    if (!imageValue) return "";
+    if (!isImageAssetRef(imageValue)) return imageValue;
+
+    const assetId = getImageAssetId(imageValue);
+    if (!assetId) return "";
+    if (imageAssetCache.has(assetId)) {
+        return imageAssetCache.get(assetId) || "";
+    }
+
+    try {
+        const db = await openMusicDb();
+        const asset = await new Promise((resolve, reject) => {
+            const transaction = db.transaction(IMAGE_ASSET_STORE_NAME, "readonly");
+            const request = transaction.objectStore(IMAGE_ASSET_STORE_NAME).get(assetId);
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error);
+        });
+        const imageData = typeof asset === "string" ? asset : String(asset?.data || "");
+        if (imageData) {
+            imageAssetCache.set(assetId, imageData);
+            imageAssetDataCache.set(imageData, imageValue);
+        }
+        return imageData;
+    } catch (error) {
+        console.warn("Failed to resolve image asset", error);
+        return "";
+    }
+}
+
+function setResolvedImageSource(img, imageValue) {
+    const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    img.dataset.imageResolveToken = token;
+    if (!imageValue) {
+        img.removeAttribute("src");
+        return;
+    }
+
+    resolveImageAsset(imageValue).then((resolved) => {
+        if (img.dataset.imageResolveToken !== token) return;
+        if (resolved) {
+            img.src = resolved;
+        } else {
+            img.removeAttribute("src");
+        }
+    });
+}
+
+function updateProfileDisplay(picData, cropData = null) {
+    const token = ++profileDisplayToken;
+    resolveImageAsset(picData).then((resolved) => {
+        if (token !== profileDisplayToken) return;
+        if (!resolved) {
+            clearProfileDisplay();
+            return;
+        }
+        [headerProfileImg, profilePreview].forEach((img) => {
+            img.src = resolved;
+            img.classList.remove("hidden");
+            applyProfileCropStyles(img, cropData);
+        });
+        [defaultAvatar, previewPlus].forEach((el) => el.classList.add("hidden"));
+    });
 }
 
 function addImageToHistory(list = [], imageData, limit = 12) {
@@ -672,7 +784,7 @@ function addImageToHistory(list = [], imageData, limit = 12) {
     return next.slice(0, limit);
 }
 
-function renderProfileImageLibrary(user = getCurrentUser()) {
+async function renderProfileImageLibrary(user = getCurrentUser()) {
     if (!profileImageLibrary) return;
     const items = Array.isArray(user?.profileImageHistory) ? user.profileImageHistory : [];
     profileImageLibrary.innerHTML = "";
@@ -680,7 +792,10 @@ function renderProfileImageLibrary(user = getCurrentUser()) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "image-history-item";
-        btn.innerHTML = `<img src="${src}" alt="프로필 후보">`;
+        const image = document.createElement("img");
+        image.alt = "profile";
+        setResolvedImageSource(image, src);
+        btn.appendChild(image);
         btn.onclick = () => {
             openProfileCropModal(src, pendingProfileCrop || user?.profilePicCrop || getDefaultProfileCrop());
         };
@@ -688,7 +803,7 @@ function renderProfileImageLibrary(user = getCurrentUser()) {
     });
 }
 
-function renderBackgroundImageLibrary(user = getCurrentUser()) {
+async function renderBackgroundImageLibrary(user = getCurrentUser()) {
     if (!backgroundImageLibrary) return;
     const items = Array.isArray(user?.backgroundImageHistory) ? user.backgroundImageHistory : [];
     backgroundImageLibrary.innerHTML = "";
@@ -696,7 +811,10 @@ function renderBackgroundImageLibrary(user = getCurrentUser()) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "image-history-item";
-        btn.innerHTML = `<img src="${src}" alt="배경 후보">`;
+        const image = document.createElement("img");
+        image.alt = "background";
+        setResolvedImageSource(image, src);
+        btn.appendChild(image);
         btn.onclick = () => {
             pendingBackgroundImage = src;
             pendingBackgroundReset = false;
@@ -739,16 +857,31 @@ function applyBorderEffect(isRainbow, color) {
 }
 
 function applySiteWallpaper(imageData, applyToHeader) {
-    const hasWallpaper = Boolean(imageData);
-    document.body.classList.toggle("has-custom-wallpaper", hasWallpaper);
-    document.body.style.backgroundImage = hasWallpaper ? `url(${imageData})` : "";
-    pageHeader.style.setProperty("background-color", "#ffffff", "important");
-    pageHeader.style.setProperty("background-image", imageData && applyToHeader
-        ? `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(${imageData})`
-        : "none", "important");
-    pageHeader.style.setProperty("background-position", "center", "important");
-    pageHeader.style.setProperty("background-size", "cover", "important");
-    pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+    const token = ++wallpaperApplyToken;
+    const applyResolvedWallpaper = (resolvedImage) => {
+        if (token !== wallpaperApplyToken) return;
+        const hasWallpaper = Boolean(resolvedImage);
+        document.body.classList.toggle("has-custom-wallpaper", hasWallpaper);
+        document.body.style.backgroundImage = hasWallpaper ? `url("${resolvedImage}")` : "";
+        pageHeader.style.setProperty("background-color", "#ffffff", "important");
+        pageHeader.style.setProperty(
+            "background-image",
+            resolvedImage && applyToHeader
+                ? `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url("${resolvedImage}")`
+                : "none",
+            "important"
+        );
+        pageHeader.style.setProperty("background-position", "center", "important");
+        pageHeader.style.setProperty("background-size", "cover", "important");
+        pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+    };
+
+    if (!imageData) {
+        applyResolvedWallpaper("");
+        return;
+    }
+
+    resolveImageAsset(imageData).then(applyResolvedWallpaper);
 }
 
 function applyMusicBackgroundOpacity(opacityValue) {
@@ -842,7 +975,7 @@ function renderCustomMainItems(layout = getMainPageLayoutForUser()) {
 
         const label = document.createElement("div");
         label.className = "main-custom-text editable-welcome";
-        label.innerHTML = item.html || escapeHtml(item.text || "새 문구");
+        label.innerHTML = item.html || escapeHtml(item.text || "??臾멸뎄");
         if (!item.html) {
             const toolState = { ...getDefaultWelcomeToolState(), ...(item.toolState || {}) };
             label.style.color = toolState.color;
@@ -881,7 +1014,7 @@ function renderCustomMainItems(layout = getMainPageLayoutForUser()) {
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
         deleteBtn.className = "main-custom-delete";
-        deleteBtn.textContent = "×";
+        deleteBtn.textContent = "횞";
         deleteBtn.addEventListener("click", (event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -903,17 +1036,17 @@ function renderCustomMainItems(layout = getMainPageLayoutForUser()) {
 
         const img = document.createElement("img");
         img.className = "main-custom-image";
-        img.src = item.src;
         img.alt = item.alt || "Custom";
         img.style.width = `${item.width || 240}px`;
         img.style.setProperty("--image-neon-color", item.neonColor || "#62e7ff");
         img.style.setProperty("--image-neon-alpha", String(item.neonIntensity ?? 0.55));
+        setResolvedImageSource(img, item.src);
 
         wrapper.appendChild(img);
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
         deleteBtn.className = "main-custom-delete";
-        deleteBtn.textContent = "×";
+        deleteBtn.textContent = "횞";
         deleteBtn.addEventListener("click", (event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -1052,7 +1185,7 @@ function renderMainPresetPanel() {
     const presets = getMainPagePresets();
     document.querySelectorAll(".main-preset-slot").forEach((slotEl, index) => {
         const hasPreset = Boolean(presets[index]);
-        slotEl.querySelector("strong").textContent = hasPreset ? `프리셋 ${index + 1} 저장됨` : `프리셋 ${index + 1}`;
+        slotEl.querySelector("strong").textContent = hasPreset ? `?꾨━??${index + 1} ??λ맖` : `?꾨━??${index + 1}`;
         const applyBtn = slotEl.querySelector(".preset-apply-btn");
         applyBtn.disabled = !hasPreset;
         applyBtn.style.opacity = hasPreset ? "1" : "0.55";
@@ -1062,7 +1195,7 @@ function renderMainPresetPanel() {
 function saveMainPresetSlot(index) {
     const currentUser = getCurrentUser();
     if (!currentUser) {
-        alert("로그인 후 프리셋을 저장할 수 있습니다.");
+        alert("濡쒓렇?????꾨━?뗭쓣 ??ν븷 ???덉뒿?덈떎.");
         return;
     }
     if (isEditingWelcomeText) finishWelcomeTextEditing(true);
@@ -1089,7 +1222,7 @@ function saveMainPresetSlot(index) {
 function applyMainPresetSlot(index) {
     const currentUser = getCurrentUser();
     if (!currentUser) {
-        alert("로그인 후 프리셋을 불러올 수 있습니다.");
+        alert("濡쒓렇?????꾨━?뗭쓣 遺덈윭?????덉뒿?덈떎.");
         return;
     }
     const presets = getMainPagePresets(currentUser);
@@ -1136,8 +1269,8 @@ function addCustomTextAtContextPoint() {
                 id: nextId,
                 x: mainContextMenuPoint.x,
                 y: mainContextMenuPoint.y,
-                text: "새 문구",
-                html: escapeHtml("새 문구"),
+                text: "??臾멸뎄",
+                html: escapeHtml("??臾멸뎄"),
                 toolState: getDefaultWelcomeToolState()
             }
         ]
@@ -1149,17 +1282,18 @@ function addCustomTextAtContextPoint() {
     });
 }
 
-function handleCustomImagePick(event) {
+async function handleCustomImagePick(event) {
     if (!isMainEditMode || !getCurrentUser()) return;
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
     if (file.size > MAX_BACKGROUND_IMAGE_SIZE) {
-        alert("이미지 용량이 너무 큽니다. 12MB 이하 이미지를 사용해주세요.");
+        alert("이미지 용량이 너무 큽니다. 24MB 이하 이미지를 사용해주세요.");
         return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
+    try {
+        const imageData = await readFileAsDataUrl(file);
+        const storedImage = await saveImageAsset(imageData);
         const nextId = `image-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         updateMainPageLayout((layout) => ({
             ...layout,
@@ -1172,15 +1306,17 @@ function handleCustomImagePick(event) {
                     width: 240,
                     neonColor: "#62e7ff",
                     neonIntensity: 0.55,
-                    src: reader.result,
+                    src: storedImage,
                     alt: file.name
                 }
             ]
         }));
         applyMainPageLayout();
         openSizeToolbarFor({ type: "custom-image", id: nextId }, window.innerWidth / 2, window.innerHeight - 120);
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+        console.warn("Failed to store custom main image", error);
+        alert("?대?吏瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲?? ?ㅼ떆 ?쒕룄?댁＜?몄슂.");
+    }
 }
 
 function deleteCustomMainItem(type, id) {
@@ -1271,22 +1407,22 @@ function openSizeToolbarFor(target, clientX, clientY) {
     if (!isMainEditMode || !getCurrentUser()) return;
     activeSizeTarget = target;
     const layout = getMainPageLayoutForUser();
-    let label = "크기";
+    let label = "?ш린";
     let value = 100;
     let deletable = false;
     if (target.type === "logo") {
-        label = "로고 크기";
+        label = "濡쒓퀬 ?ш린";
         value = layout.logo.scale || 100;
         if (mainSizeNeonColor) mainSizeNeonColor.value = getCurrentUser()?.logoNeonColor || "#62e7ff";
         if (mainSizeNeonIntensity) mainSizeNeonIntensity.value = "70";
     } else if (target.type === "shortcuts") {
-        label = "즐겨찾기 크기";
+        label = "利먭꺼李얘린 ?ш린";
         value = layout.shortcuts.scale || 100;
         if (mainSizeNeonColor) mainSizeNeonColor.value = "#62e7ff";
         if (mainSizeNeonIntensity) mainSizeNeonIntensity.value = "0";
     } else if (target.type === "custom-image") {
         const item = layout.customImages.find((entry) => entry.id === target.id);
-        label = "이미지 크기";
+        label = "?대?吏 ?ш린";
         value = Math.round(((item?.width || 240) / 240) * 100);
         deletable = true;
         if (mainSizeNeonColor) mainSizeNeonColor.value = item?.neonColor || "#62e7ff";
@@ -1366,64 +1502,66 @@ function switchSettingsTab(tab) {
     settingsPanelEnvironment.classList.toggle("is-active", !isAccount);
 }
 
-function handleProfileImageChange(e) {
+async function handleProfileImageChange(e) {
     const file = e.target.files[0];
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-        alert("이미지 파일만 업로드할 수 있습니다.");
+        alert("?대?吏 ?뚯씪留??낅줈?쒗븷 ???덉뒿?덈떎.");
         e.target.value = "";
         return;
     }
 
     if (file.size > MAX_PROFILE_IMAGE_SIZE) {
-        alert("프로필 이미지는 8MB 이하로 업로드해주세요. 움직이는 이미지는 용량이 큰 경우가 많습니다.");
+        alert("프로필 이미지는 16MB 이하로 업로드해주세요. 움직이는 이미지나 큰 이미지는 용량이 금방 커질 수 있습니다.");
         e.target.value = "";
         return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-        alert("움직이는 이미지를 포함해 프로필 사진은 8MB 이하까지 사용할 수 있습니다. 현재 파일은 조금 큰 편입니다.");
+    if (file.size > 8 * 1024 * 1024) {
+        alert("움직이는 이미지나 큰 프로필 사진은 16MB 이하까지 사용할 수 있지만, 현재 파일은 꽤 큰 편입니다.");
     }
 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-        const imageData = ev.target.result;
+    try {
+        const imageData = await readFileAsDataUrl(file);
+        const storedImage = await saveImageAsset(imageData);
         const currentUser = getCurrentUser();
         if (currentUser) {
             const users = getUsers();
             const index = users.findIndex((user) => user.id === currentUser.id);
             if (index !== -1) {
-                users[index].profileImageHistory = addImageToHistory(users[index].profileImageHistory, imageData);
+                users[index].profileImageHistory = addImageToHistory(users[index].profileImageHistory, storedImage);
                 saveUsers(users);
                 renderProfileImageLibrary(users[index]);
             }
         }
-        openProfileCropModal(imageData, pendingProfileCrop || getCurrentUser()?.profilePicCrop || getDefaultProfileCrop());
-    };
-    reader.readAsDataURL(file);
+        openProfileCropModal(storedImage, pendingProfileCrop || getCurrentUser()?.profilePicCrop || getDefaultProfileCrop());
+    } catch (error) {
+        console.warn("Failed to load profile image", error);
+        alert("?꾨줈???대?吏瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲?? ?ㅼ떆 ?쒕룄?댁＜?몄슂.");
+    }
     e.target.value = "";
 }
 
-function handleBackgroundImageChange(event) {
+async function handleBackgroundImageChange(event) {
     const file = event.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-        alert("이미지 파일만 업로드할 수 있습니다.");
+        alert("?대?吏 ?뚯씪留??낅줈?쒗븷 ???덉뒿?덈떎.");
         event.target.value = "";
         return;
     }
 
     if (file.size > MAX_BACKGROUND_IMAGE_SIZE) {
-        alert("배경화면 이미지는 12MB 이하로 업로드해주세요. 움직이는 배경은 용량이 클 수 있습니다.");
+        alert("배경화면 이미지는 24MB 이하로 업로드해주세요. 움직이는 배경은 용량이 빠르게 커질 수 있습니다.");
         event.target.value = "";
         return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-        pendingBackgroundImage = ev.target.result;
+    try {
+        const imageData = await readFileAsDataUrl(file);
+        pendingBackgroundImage = await saveImageAsset(imageData);
         pendingBackgroundReset = false;
         const currentUser = getCurrentUser();
         if (currentUser) {
@@ -1436,8 +1574,10 @@ function handleBackgroundImageChange(event) {
             }
         }
         applySiteWallpaper(pendingBackgroundImage, applyHeaderWallpaperInput.checked);
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+        console.warn("Failed to load background image", error);
+        alert("諛곌꼍 ?대?吏瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲?? ?ㅼ떆 ?쒕룄?댁＜?몄슂.");
+    }
     event.target.value = "";
 }
 
@@ -1448,12 +1588,12 @@ function resetBackgroundImage() {
     applySiteWallpaper("", false);
 }
 
-function openProfileCropModal(imageData, initialCrop) {
+async function openProfileCropModal(imageData, initialCrop) {
     profileCropDraft = {
         imageData,
         crop: { ...getDefaultProfileCrop(), ...(initialCrop || {}) }
     };
-    profileCropImage.src = imageData;
+    profileCropImage.src = await resolveImageAsset(imageData);
     profileCropZoom.value = String(profileCropDraft.crop.scale);
     renderProfileCropStage();
     profileCropModal.classList.remove("hidden");
@@ -1506,7 +1646,7 @@ function stopProfileCropDragging() {
 }
 
 function getDefaultWelcomeMessage(user) {
-    return user ? `${user.id}님 환영합니다` : "아무개님 환영합니다";
+    return user ? `${user.id}???섏쁺?⑸땲?? : "?꾨Т媛쒕떂 ?섏쁺?⑸땲??;
 }
 
 function getDefaultWelcomeToolState() {
@@ -1759,7 +1899,7 @@ function startWelcomeTextEditing() {
     if (isEditingShortcutText) finishShortcutTextEditing(true);
     const currentUser = getCurrentUser();
     if (!currentUser) {
-        alert("로그인한 상태에서만 환영 문구를 수정할 수 있습니다.");
+        alert("濡쒓렇?명븳 ?곹깭?먯꽌留??섏쁺 臾멸뎄瑜??섏젙?????덉뒿?덈떎.");
         return;
     }
 
@@ -1855,7 +1995,7 @@ function startCustomTextEditing(labelEl, textId) {
 function finishCustomTextEditing(shouldSave) {
     if (!activeCustomTextId) return;
     const labelEl = mainCustomLayer.querySelector(`[data-id="${activeCustomTextId}"] .main-custom-text`);
-    const fallback = "새 문구";
+    const fallback = "??臾멸뎄";
     if (labelEl && shouldSave) {
         const text = labelEl.textContent.trim() || fallback;
         updateMainPageLayout((layout) => ({
@@ -2050,7 +2190,7 @@ function getStoredShortcutToolState(item) {
 function normalizeShortcutItem(item, index) {
     return {
         id: item?.id || `shortcut-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
-        name: item?.name || "즐겨찾기",
+        name: item?.name || "利먭꺼李얘린",
         url: item?.url || "",
         labelHtml: typeof item?.labelHtml === "string" ? item.labelHtml : "",
         labelToolState: {
@@ -2090,7 +2230,7 @@ function finishShortcutTextEditing(shouldSave) {
     const shortcutId = currentShortcutEditingId;
     const shortcuts = getShortcuts();
     const shortcut = shortcuts.find((item) => item.id === shortcutId);
-    const fallback = shortcut?.name || "즐겨찾기";
+    const fallback = shortcut?.name || "利먭꺼李얘린";
     const nextText = activeShortcutTextEl.textContent.trim() || fallback;
 
     if (shouldSave && shortcut) {
@@ -2228,11 +2368,11 @@ function showPage(pageId) {
 function handleSignup() {
     const id = document.getElementById("signup-id").value.trim();
     const pw = document.getElementById("signup-pw").value.trim();
-    if (!id || !pw) return alert("아이디와 비밀번호를 모두 입력해주세요!");
+    if (!id || !pw) return alert("?꾩씠?붿? 鍮꾨?踰덊샇瑜?紐⑤몢 ?낅젰?댁＜?몄슂!");
 
     const users = getUsers();
     if (users.some((user) => user.id === id)) {
-        alert("이미 존재하는 아이디입니다.");
+        alert("?대? 議댁옱?섎뒗 ?꾩씠?붿엯?덈떎.");
         return;
     }
 
@@ -2253,8 +2393,8 @@ function handleSignup() {
         profileImageHistory: [],
         backgroundImageHistory: [],
         mainPagePresets: [null, null, null],
-        welcomeMessage: `${id}님 환영합니다`,
-        welcomeMessageHtml: escapeHtml(`${id}님 환영합니다`),
+        welcomeMessage: `${id}???섏쁺?⑸땲??,
+        welcomeMessageHtml: escapeHtml(`${id}???섏쁺?⑸땲??),
         welcomeToolState: getDefaultWelcomeToolState(),
         mainPageLayout: getDefaultMainPageLayout()
     });
@@ -2263,7 +2403,7 @@ function handleSignup() {
     document.getElementById("signup-id").value = "";
     document.getElementById("signup-pw").value = "";
     document.getElementById("auth-container").classList.add("hidden");
-    alert("회원가입이 완료되었습니다.");
+    alert("?뚯썝媛?낆씠 ?꾨즺?섏뿀?듬땲??");
     location.reload();
 }
 
@@ -2272,10 +2412,10 @@ function handleLogin() {
     const pw = document.getElementById("login-pw").value.trim();
     const matchedUser = getUsers().find((user) => user.id === id && user.pw === pw);
 
-    if (!id || !pw) return alert("아이디와 비밀번호를 모두 입력해주세요!");
+    if (!id || !pw) return alert("?꾩씠?붿? 鍮꾨?踰덊샇瑜?紐⑤몢 ?낅젰?댁＜?몄슂!");
 
     if (!matchedUser) {
-        alert("아이디 또는 비밀번호가 올바르지 않습니다.");
+        alert("?꾩씠???먮뒗 鍮꾨?踰덊샇媛 ?щ컮瑜댁? ?딆뒿?덈떎.");
         return;
     }
 
@@ -2283,7 +2423,7 @@ function handleLogin() {
     document.getElementById("login-pw").value = "";
     document.getElementById("login-container").classList.add("hidden");
     localStorage.setItem(CURRENT_USER_KEY, matchedUser.id);
-    alert("로그인되었습니다.");
+    alert("濡쒓렇?몃릺?덉뒿?덈떎.");
     location.reload();
 }
 
@@ -2298,7 +2438,7 @@ function saveShortcut() {
     if (!isMainEditMode) return;
     const name = shortcutNameInput.value.trim();
     const url = shortcutUrlInput.value.trim();
-    if (!name || !url) return alert("이름과 URL을 모두 입력해주세요!");
+    if (!name || !url) return alert("?대쫫怨?URL??紐⑤몢 ?낅젰?댁＜?몄슂!");
 
     const shortcuts = getShortcuts();
     shortcuts.push({
@@ -2370,7 +2510,7 @@ function renderShortcuts() {
         label.className = "shortcut-text editable-shortcut-text";
         label.tabIndex = 0;
         label.setAttribute("role", "button");
-        label.setAttribute("aria-label", "즐겨찾기 텍스트 수정");
+        label.setAttribute("aria-label", "利먭꺼李얘린 ?띿뒪???섏젙");
         label.innerHTML = item.labelHtml || escapeHtml(item.name);
         if (!item.labelHtml) {
             const defaultState = getStoredShortcutToolState(item);
@@ -2409,8 +2549,8 @@ function renderShortcuts() {
 
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
-        deleteBtn.innerHTML = "×";
-        deleteBtn.title = "삭제";
+        deleteBtn.innerHTML = "횞";
+        deleteBtn.title = "??젣";
         deleteBtn.style.cssText = `
             position:absolute; top:-8px; right:-8px;
             width:20px; height:20px; border-radius:50%;
@@ -2447,7 +2587,7 @@ async function saveProfileSettings() {
     try {
         const currentUser = getCurrentUser();
         if (!currentUser) {
-            alert("로그인한 뒤 설정을 저장할 수 있습니다.");
+            alert("濡쒓렇?명븳 ???ㅼ젙????ν븷 ???덉뒿?덈떎.");
             return;
         }
 
@@ -2459,7 +2599,7 @@ async function saveProfileSettings() {
         if (currentIndex === -1) return;
 
         if (newId && users.some((user, index) => user.id === newId && index !== currentIndex)) {
-            alert("이미 사용 중인 이름입니다.");
+            alert("?대? ?ъ슜 以묒씤 ?대쫫?낅땲??");
             return;
         }
 
@@ -2490,7 +2630,7 @@ async function saveProfileSettings() {
             localStorage.setItem(CURRENT_USER_KEY, newId);
         }
 
-        alert("설정이 저장되었습니다!");
+        alert("?ㅼ젙????λ릺?덉뒿?덈떎!");
         pendingProfilePic = null;
         pendingProfileCrop = null;
         pendingBackgroundImage = null;
@@ -2500,7 +2640,7 @@ async function saveProfileSettings() {
         renderMusicUI();
         renderVideoUI();
     } catch (error) {
-        alert("저장 공간이 부족하거나 오류가 발생했습니다. 사진 크기를 줄여보세요.");
+        alert("???怨듦컙??遺議깊븯嫄곕굹 ?ㅻ쪟媛 諛쒖깮?덉뒿?덈떎. ?ъ쭊 ?ш린瑜?以꾩뿬蹂댁꽭??");
     }
 }
 
@@ -2613,7 +2753,7 @@ function bindMusicEvents() {
 
     musicAudio.addEventListener("pause", () => {
         syncPlaybackUi();
-        // 일시정지 시 영상 시간 먼저 정확히 맞추고 정지
+        // ?쇱떆?뺤? ???곸긽 ?쒓컙 癒쇱? ?뺥솗??留욎텛怨??뺤?
         forceSyncMusicBackgroundVideoTime();
         if (musicBackgroundVideoPlayer && typeof musicBackgroundVideoPlayer.pauseVideo === "function") {
             try { musicBackgroundVideoPlayer.pauseVideo(); } catch (e) { /* ignore */ }
@@ -2624,7 +2764,7 @@ function bindMusicEvents() {
         handleTrackEnded();
     });
 
-    // 음악 seek 시 영상 시간 즉시 강제 동기화 (threshold 없이 무조건)
+    // ?뚯븙 seek ???곸긽 ?쒓컙 利됱떆 媛뺤젣 ?숆린??(threshold ?놁씠 臾댁“嫄?
     musicAudio.addEventListener("seeked", () => {
         forceSyncMusicBackgroundVideoTime();
     });
@@ -2632,7 +2772,7 @@ function bindMusicEvents() {
     musicAudio.addEventListener("loadedmetadata", () => updatePlaybackProgressUi());
     musicAudio.addEventListener("timeupdate", () => {
         updatePlaybackProgressUi();
-        // 재생 중 자연스러운 drift 보정
+        // ?ъ깮 以??먯뿰?ㅻ윭??drift 蹂댁젙
         if (!musicAudio.paused && !musicAudio.ended) {
             syncMusicBackgroundVideoTime();
         }
@@ -2687,6 +2827,9 @@ async function loadMusicState() {
     if (playbackVolume) playbackVolume.value = String(Math.round(musicState.volume * 100));
 
     normalizeSelectedTrack();
+    if (isLoggedInUser()) {
+        await migrateStoredImageAssetsForCurrentUser();
+    }
     saveMusicState();
 }
 
@@ -2727,8 +2870,8 @@ function migrateLegacyUserData() {
         profileImageHistory: [],
         backgroundImageHistory: [],
         mainPagePresets: [null, null, null],
-        welcomeMessage: `${legacyId}님 환영합니다`,
-        welcomeMessageHtml: escapeHtml(`${legacyId}님 환영합니다`),
+        welcomeMessage: `${legacyId}???섏쁺?⑸땲??,
+        welcomeMessageHtml: escapeHtml(`${legacyId}???섏쁺?⑸땲??),
         welcomeToolState: getDefaultWelcomeToolState(),
         mainPageLayout: getDefaultMainPageLayout()
     };
@@ -2870,14 +3013,14 @@ async function saveMusicTrack() {
         const youtubeUrl = youtubeLinkInput.value.trim();
         const youtubeId = extractYouTubeId(youtubeUrl);
         if (!youtubeId) {
-            alert("올바른 유튜브 링크를 입력해주세요.");
+            alert("?щ컮瑜??좏뒠釉?留곹겕瑜??낅젰?댁＜?몄슂.");
             return;
         }
 
         const trackId = createId("track");
         musicState.library.push(normalizeTrackData({
             id: trackId,
-            name: customTitle || "유튜브 음악",
+            name: customTitle || "?좏뒠釉??뚯븙",
             sourceType: "youtube",
             youtubeId,
             youtubeUrl
@@ -2886,7 +3029,7 @@ async function saveMusicTrack() {
     } else {
         const file = musicFileInput.files[0];
         if (!file) {
-            alert("추가할 mp3 파일을 선택해주세요.");
+            alert("異붽???mp3 ?뚯씪???좏깮?댁＜?몄슂.");
             return;
         }
 
@@ -2954,7 +3097,7 @@ function moveSelection(direction) {
 async function handleRecordInteraction() {
     const selectedTrack = getTrackById(musicState.selectedTrackId);
     if (!selectedTrack) {
-        alert("먼저 재생할 음악을 선택해주세요.");
+        alert("癒쇱? ?ъ깮???뚯븙???좏깮?댁＜?몄슂.");
         return;
     }
 
@@ -3015,17 +3158,18 @@ async function toggleCurrentPlayback(track) {
         try {
             await musicAudio.play();
         } catch {
-            alert("브라우저가 재생을 다시 시작하지 못했습니다. 다시 눌러주세요.");
+            alert("釉뚮씪?곗?媛 ?ъ깮???ㅼ떆 ?쒖옉?섏? 紐삵뻽?듬땲?? ?ㅼ떆 ?뚮윭二쇱꽭??");
         }
     }
 
     syncPlaybackUi();
+    forceSyncMusicBackgroundVideoTime();
 }
 
 async function playSelectedTrack() {
     const selectedTrack = getTrackById(musicState.selectedTrackId);
     if (!selectedTrack) {
-        alert("먼저 재생할 음악을 선택해주세요.");
+        alert("癒쇱? ?ъ깮???뚯븙???좏깮?댁＜?몄슂.");
         return;
     }
 
@@ -3043,7 +3187,7 @@ async function playSelectedTrack() {
 
     const blob = await getTrackBlob(selectedTrack.id);
     if (!blob) {
-        alert("음악 파일을 불러오지 못했습니다.");
+        alert("?뚯븙 ?뚯씪??遺덈윭?ㅼ? 紐삵뻽?듬땲??");
         return;
     }
 
@@ -3056,7 +3200,7 @@ async function playSelectedTrack() {
     try {
         await musicAudio.play();
     } catch {
-        alert("브라우저가 재생을 시작하지 못했습니다. 다시 눌러주세요.");
+        alert("釉뚮씪?곗?媛 ?ъ깮???쒖옉?섏? 紐삵뻽?듬땲?? ?ㅼ떆 ?뚮윭二쇱꽭??");
     }
 
     renderMusicUI();
@@ -3068,7 +3212,7 @@ async function playYoutubeTrack(track) {
 
     const player = await ensureYoutubePlayer();
     if (!player) {
-        alert("유튜브 플레이어를 불러오지 못했습니다.");
+        alert("?좏뒠釉??뚮젅?댁뼱瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??");
         return;
     }
 
@@ -3214,7 +3358,7 @@ function renderPlaylist() {
             item.textContent = "-";
         } else {
             const track = getTrackById(trackIds[index]);
-            item.textContent = track ? track.name : "알 수 없는 음악";
+            item.textContent = track ? track.name : "?????녿뒗 ?뚯븙";
 
             if (role === "selected") item.classList.add("is-selected");
             if (role === "prev") item.classList.add("is-prev");
@@ -3237,13 +3381,13 @@ function updatePlaybackTexts() {
     const playingTrack = getTrackById(musicState.playingTrackId);
 
     recordHint.textContent = selectedTrack
-        ? `선택된 음악: ${selectedTrack.name}`
-        : "재생할 음악을 선택한 뒤 음반을 눌러주세요";
+        ? `?좏깮???뚯븙: ${selectedTrack.name}`
+        : "?ъ깮???뚯븙???좏깮?????뚮컲???뚮윭二쇱꽭??;
 
     if (playingTrack) {
-        nowPlayingTitle.textContent = `재생 중: ${playingTrack.name}`;
+        nowPlayingTitle.textContent = `?ъ깮 以? ${playingTrack.name}`;
     } else {
-        nowPlayingTitle.textContent = "재생 중인 음악 없음";
+        nowPlayingTitle.textContent = "?ъ깮 以묒씤 ?뚯븙 ?놁쓬";
     }
 }
 
@@ -3277,7 +3421,7 @@ function renderPlaylistEditor() {
     if (!playlist.trackIds.length) {
         const empty = document.createElement("div");
         empty.className = "playlist-edit-subtitle";
-        empty.textContent = "이 재생목록에는 아직 음악이 없습니다.";
+        empty.textContent = "???ъ깮紐⑸줉?먮뒗 ?꾩쭅 ?뚯븙???놁뒿?덈떎.";
         playlistEditList.appendChild(empty);
         deletePlaylistBtn.disabled = musicState.playlists.length <= 1;
         return;
@@ -3291,22 +3435,22 @@ function renderPlaylistEditor() {
         const meta = document.createElement("div");
         meta.className = "playlist-edit-meta";
         meta.innerHTML = `
-            <div class="playlist-edit-title">${track ? track.name : "알 수 없는 음악"}</div>
-            <div class="playlist-edit-subtitle">${index + 1}번째 곡</div>
+            <div class="playlist-edit-title">${track ? track.name : "?????녿뒗 ?뚯븙"}</div>
+            <div class="playlist-edit-subtitle">${index + 1}踰덉㎏ 怨?/div>
         `;
 
         const controls = document.createElement("div");
         controls.className = "playlist-edit-controls";
 
-        const upBtn = createMiniButton("↑", "위로");
+        const upBtn = createMiniButton("??, "?꾨줈");
         upBtn.disabled = index === 0;
         upBtn.onclick = () => moveTrackInsidePlaylist(index, -1);
 
-        const downBtn = createMiniButton("↓", "아래로");
+        const downBtn = createMiniButton("??, "?꾨옒濡?);
         downBtn.disabled = index === playlist.trackIds.length - 1;
         downBtn.onclick = () => moveTrackInsidePlaylist(index, 1);
 
-        const removeBtn = createMiniButton("×", "제거");
+        const removeBtn = createMiniButton("횞", "?쒓굅");
         removeBtn.onclick = () => removeTrackFromPlaylist(index);
 
         controls.append(upBtn, downBtn, removeBtn);
@@ -3329,7 +3473,7 @@ function renderLibraryPicker() {
     if (!musicState.library.length) {
         const empty = document.createElement("div");
         empty.className = "playlist-edit-subtitle";
-        empty.textContent = "보관함에 추가된 노래가 아직 없습니다.";
+        empty.textContent = "蹂닿??⑥뿉 異붽????몃옒媛 ?꾩쭅 ?놁뒿?덈떎.";
         libraryPickerList.appendChild(empty);
         return;
     }
@@ -3342,14 +3486,14 @@ function renderLibraryPicker() {
         meta.className = "playlist-edit-meta";
         meta.innerHTML = `
             <div class="playlist-edit-title">${track.name}</div>
-            <div class="library-picker-type">${track.sourceType === "youtube" ? "유튜브 링크" : "mp3 파일"}</div>
+            <div class="library-picker-type">${track.sourceType === "youtube" ? "?좏뒠釉?留곹겕" : "mp3 ?뚯씪"}</div>
         `;
 
         const addBtn = document.createElement("button");
         addBtn.type = "button";
         addBtn.className = "nav-btn";
         const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
-        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
+        addBtn.textContent = alreadyAdded ? "異붽??? : "?ъ깮紐⑸줉??異붽?";
         addBtn.disabled = alreadyAdded;
         addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
 
@@ -3369,7 +3513,7 @@ function requestTrackBackgroundVideo(trackId) {
     const currentUrl = track.customBackgroundVideoId
         ? `https://www.youtube.com/watch?v=${track.customBackgroundVideoId}`
         : "";
-    const input = prompt("배경으로 사용할 유튜브 링크를 입력해 주세요.", currentUrl);
+    const input = prompt("諛곌꼍?쇰줈 ?ъ슜???좏뒠釉?留곹겕瑜??낅젰??二쇱꽭??", currentUrl);
     if (input === null) return;
 
     const trimmed = input.trim();
@@ -3384,7 +3528,7 @@ function requestTrackBackgroundVideo(trackId) {
 
     const youtubeId = extractYouTubeId(trimmed);
     if (!youtubeId) {
-        alert("올바른 유튜브 링크를 입력해 주세요.");
+        alert("?щ컮瑜??좏뒠釉?留곹겕瑜??낅젰??二쇱꽭??");
         return;
     }
 
@@ -3415,6 +3559,7 @@ function applyMusicTrackBackdrop() {
         ? pendingBackgroundImage
         : (currentUser?.backgroundImage || "");
     const applyHeaderWallpaper = Boolean(applyHeaderWallpaperInput?.checked || currentUser?.applyHeaderWallpaper);
+    const resolvedBackgroundArt = backgroundArt ? await resolveImageAsset(backgroundArt) : "";
     const backdropKey = backgroundVideoId
         ? `video:${backgroundVideoId}@${backgroundVideoStart}`
         : (backgroundArt ? `image:${backgroundArt}` : "");
@@ -4522,7 +4667,7 @@ function closeVideoViewer(clearCurrent) {
 
 function formatPreciseSeconds(seconds) {
     const safe = Math.max(0, Number(seconds) || 0);
-    return `${safe.toFixed(2)}초`;
+    return `${safe.toFixed(2)}珥?;
 }
 
 function updateTrackBackgroundVideoStartDisplay(value) {
@@ -4662,7 +4807,7 @@ async function openTrackBackgroundVideoModal(trackId) {
         trackBackgroundVideoCurrentTime.textContent = formatPreciseSeconds(pendingTrackBackgroundVideoStart);
     }
     if (trackBackgroundVideoDuration) {
-        trackBackgroundVideoDuration.textContent = "0.00초";
+        trackBackgroundVideoDuration.textContent = "0.00珥?;
     }
 
     trackBackgroundVideoModal?.classList.remove("hidden");
@@ -4680,7 +4825,7 @@ async function saveTrackBackgroundVideoSettings() {
     const youtubeUrl = trackBackgroundVideoUrlInput?.value.trim() || "";
     const youtubeId = extractYouTubeId(youtubeUrl);
     if (!youtubeId) {
-        alert("올바른 유튜브 링크를 입력해 주세요.");
+        alert("?щ컮瑜??좏뒠釉?留곹겕瑜??낅젰??二쇱꽭??");
         return;
     }
 
@@ -4856,7 +5001,7 @@ function requestTrackBackgroundVideo(trackId) {
     const currentUrl = track.customBackgroundVideoId
         ? `https://www.youtube.com/watch?v=${track.customBackgroundVideoId}`
         : "";
-    const urlInput = prompt("배경으로 사용할 유튜브 링크를 입력해 주세요.", currentUrl);
+    const urlInput = prompt("諛곌꼍?쇰줈 ?ъ슜???좏뒠釉?留곹겕瑜??낅젰??二쇱꽭??", currentUrl);
     if (urlInput === null) return;
 
     const trimmedUrl = urlInput.trim();
@@ -4871,19 +5016,19 @@ function requestTrackBackgroundVideo(trackId) {
 
     const youtubeId = extractYouTubeId(trimmedUrl);
     if (!youtubeId) {
-        alert("올바른 유튜브 링크를 입력해 주세요.");
+        alert("?щ컮瑜??좏뒠釉?留곹겕瑜??낅젰??二쇱꽭??");
         return;
     }
 
     const startInput = prompt(
-        "배경 영상 시작 시점을 입력해 주세요. 소수점 입력이 가능합니다. 예: 12.35 또는 1:23.45",
+        "諛곌꼍 ?곸긽 ?쒖옉 ?쒖젏???낅젰??二쇱꽭?? ?뚯닔???낅젰??媛?ν빀?덈떎. ?? 12.35 ?먮뒗 1:23.45",
         String(track.customBackgroundVideoStart || 0)
     );
     if (startInput === null) return;
 
     const startSeconds = parseMusicBackgroundVideoStart(startInput);
     if (!Number.isFinite(startSeconds) || startSeconds < 0) {
-        alert("시작 시점은 0 이상의 숫자 또는 분:초 형식으로 입력해 주세요.");
+        alert("?쒖옉 ?쒖젏? 0 ?댁긽???レ옄 ?먮뒗 遺?珥??뺤떇?쇰줈 ?낅젰??二쇱꽭??");
         return;
     }
 
@@ -5055,11 +5200,11 @@ async function applyMusicTrackBackdrop() {
                         startSeconds: backgroundVideoStart
                     });
                 }
-                // 재생 중일 때만 영상 재생, 정지 상태면 로드 후 일시정지
+                // ?ъ깮 以묒씪 ?뚮쭔 ?곸긽 ?ъ깮, ?뺤? ?곹깭硫?濡쒕뱶 ???쇱떆?뺤?
                 if (isPlaying) {
                     if (typeof player.playVideo === "function") player.playVideo();
                 } else {
-                    // 썸네일 프레임을 보여주기 위해 잠깐 로드 후 일시정지
+                    // ?몃꽕???꾨젅?꾩쓣 蹂댁뿬二쇨린 ?꾪빐 ?좉퉸 濡쒕뱶 ???쇱떆?뺤?
                     setTimeout(() => {
                         try {
                             if (typeof player.pauseVideo === "function") player.pauseVideo();
@@ -5067,7 +5212,7 @@ async function applyMusicTrackBackdrop() {
                     }, 300);
                 }
             } else {
-                // 같은 영상인데 재생 상태가 바뀐 경우 (play ↔ pause)
+                // 媛숈? ?곸긽?몃뜲 ?ъ깮 ?곹깭媛 諛붾?寃쎌슦 (play ??pause)
                 if (isPlaying) {
                     if (typeof player.playVideo === "function") player.playVideo();
                 } else {
@@ -5079,14 +5224,22 @@ async function applyMusicTrackBackdrop() {
         applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
     } else {
         stopMusicBackgroundVideoPlayback();
+        if (!resolvedBackgroundArt) {
+            musicPage.classList.remove("has-track-background");
+            musicPage.style.setProperty("--music-track-bg-url", "none");
+            if (isMusicPageVisible) {
+                applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+            }
+            return;
+        }
         musicPage.classList.add("has-track-background");
-        musicPage.style.setProperty("--music-track-bg-url", `url("${backgroundArt}")`);
+        musicPage.style.setProperty("--music-track-bg-url", `url("${resolvedBackgroundArt}")`);
 
         if (isMusicPageVisible && applyMusicHeaderWallpaper) {
             pageHeader.style.setProperty("background-color", "#ffffff", "important");
             pageHeader.style.setProperty(
                 "background-image",
-                `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(${backgroundArt})`,
+                `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url("${resolvedBackgroundArt}")`,
                 "important"
             );
             pageHeader.style.setProperty("background-position", "center top", "important");
@@ -5104,7 +5257,7 @@ async function applyMusicTrackBackdrop() {
     }
 }
 
-// 현재 재생 중인 음악의 currentTime을 반환 (youtube / audio 모두 지원)
+// ?꾩옱 ?ъ깮 以묒씤 ?뚯븙??currentTime??諛섑솚 (youtube / audio 紐⑤몢 吏??
 function getMusicCurrentTime() {
     const playingTrack = getTrackById(musicState.playingTrackId);
     if (!playingTrack) return 0;
@@ -5116,13 +5269,13 @@ function getMusicCurrentTime() {
     return Number.isFinite(musicAudio.currentTime) ? musicAudio.currentTime : 0;
 }
 
-// debounce 타이머 (forceSyncMusicBackgroundVideoTime 연속 호출 방지)
+// debounce ??대㉧ (forceSyncMusicBackgroundVideoTime ?곗냽 ?몄텧 諛⑹?)
 let _forceSyncDebounceTimer = null;
 
-// 음악 재생 시간과 배경 영상 시간을 동기화하는 함수 (drift 보정용, 1.5초 threshold)
-// — 스크럽 중에는 호출하지 않음 (isScrubbingPlayback 확인)
+// ?뚯븙 ?ъ깮 ?쒓컙怨?諛곌꼍 ?곸긽 ?쒓컙???숆린?뷀븯???⑥닔 (drift 蹂댁젙?? 1.5珥?threshold)
+// ???ㅽ겕??以묒뿉???몄텧?섏? ?딆쓬 (isScrubbingPlayback ?뺤씤)
 function syncMusicBackgroundVideoTime() {
-    if (isScrubbingPlayback) return;               // 드래그 중엔 완전 차단
+    if (isScrubbingPlayback) return;               // ?쒕옒洹?以묒뿏 ?꾩쟾 李⑤떒
     if (!musicBackgroundVideoPlayer) return;
     if (typeof musicBackgroundVideoPlayer.getCurrentTime !== "function") return;
     if (!window.YT) return;
@@ -5136,15 +5289,14 @@ function syncMusicBackgroundVideoTime() {
 
     try {
         const videoCurrentTime = musicBackgroundVideoPlayer.getCurrentTime();
-        // 1.5초 이상 차이날 때만 보정 — 자연 재생 중 불필요한 seek 최소화
-        if (Math.abs(videoCurrentTime - targetVideoTime) > 1.5) {
+        // 1.5珥??댁긽 李⑥씠???뚮쭔 蹂댁젙 ???먯뿰 ?ъ깮 以?遺덊븘?뷀븳 seek 理쒖냼??        if (Math.abs(videoCurrentTime - targetVideoTime) > 1.5) {
             musicBackgroundVideoPlayer.seekTo(targetVideoTime, true);
         }
     } catch (e) { /* ignore */ }
 }
 
-// seek / 정지 등 즉각적인 상황에서 영상 시간을 동기화 (debounce 150ms)
-// — 연속 호출이 와도 마지막 한 번만 실제 seekTo 실행
+// seek / ?뺤? ??利됯컖?곸씤 ?곹솴?먯꽌 ?곸긽 ?쒓컙???숆린??(debounce 150ms)
+// ???곗냽 ?몄텧?????留덉?留???踰덈쭔 ?ㅼ젣 seekTo ?ㅽ뻾
 function forceSyncMusicBackgroundVideoTime() {
     if (_forceSyncDebounceTimer) {
         clearTimeout(_forceSyncDebounceTimer);
@@ -5191,7 +5343,7 @@ function createMiniButton(label, title) {
 
 function createPlaylist() {
     const rawName = playlistNameInput.value.trim();
-    const name = rawName || `새 재생목록 ${musicState.playlists.length + 1}`;
+    const name = rawName || `???ъ깮紐⑸줉 ${musicState.playlists.length + 1}`;
     const newPlaylist = createPlaylistObject(name);
     musicState.playlists.push(newPlaylist);
     musicState.currentPlaylistId = newPlaylist.id;
@@ -5206,7 +5358,7 @@ function renameCurrentPlaylist() {
     if (!playlist) return;
 
     const newName = playlistNameInput.value.trim();
-    if (!newName) return alert("재생목록 이름을 입력해주세요.");
+    if (!newName) return alert("?ъ깮紐⑸줉 ?대쫫???낅젰?댁＜?몄슂.");
 
     playlist.name = newName;
     saveMusicState();
@@ -5216,7 +5368,7 @@ function renameCurrentPlaylist() {
 
 function deleteCurrentPlaylist() {
     if (musicState.playlists.length <= 1) {
-        alert("마지막 재생목록은 삭제할 수 없습니다.");
+        alert("留덉?留??ъ깮紐⑸줉? ??젣?????놁뒿?덈떎.");
         return;
     }
 
@@ -5304,12 +5456,15 @@ function openMusicDb() {
     if (musicDbPromise) return musicDbPromise;
 
     musicDbPromise = new Promise((resolve, reject) => {
-        const request = indexedDB.open(MUSIC_DB_NAME, 1);
+        const request = indexedDB.open(MUSIC_DB_NAME, 2);
 
         request.onupgradeneeded = () => {
             const db = request.result;
             if (!db.objectStoreNames.contains(MUSIC_STORE_NAME)) {
                 db.createObjectStore(MUSIC_STORE_NAME);
+            }
+            if (!db.objectStoreNames.contains(IMAGE_ASSET_STORE_NAME)) {
+                db.createObjectStore(IMAGE_ASSET_STORE_NAME);
             }
         };
 
@@ -5318,6 +5473,113 @@ function openMusicDb() {
     });
 
     return musicDbPromise;
+}
+
+async function migrateStoredImageAssetsForCurrentUser() {
+    if (!isLoggedInUser()) return;
+    await openMusicDb();
+
+    let users = getUsers();
+    const currentUser = getCurrentUser();
+    const userIndex = users.findIndex((user) => user.id === currentUser?.id);
+    let userChanged = false;
+    let musicChanged = false;
+
+    const migrateValue = async (value) => {
+        if (!value || isImageAssetRef(value) || !isInlineImageData(value)) return value || "";
+        return saveImageAsset(value);
+    };
+
+    const migrateList = async (items) => {
+        if (!Array.isArray(items) || !items.length) return items;
+        const nextItems = [];
+        let changed = false;
+        for (const item of items) {
+            const nextItem = await migrateValue(item);
+            if (nextItem !== item) changed = true;
+            nextItems.push(nextItem);
+        }
+        return changed ? nextItems : items;
+    };
+
+    const migrateLayout = async (layout) => {
+        if (!layout) return layout;
+        const nextLayout = { ...layout };
+        if (Array.isArray(layout.customImages)) {
+            let changed = false;
+            nextLayout.customImages = [];
+            for (const item of layout.customImages) {
+                const nextSrc = await migrateValue(item?.src || "");
+                changed = changed || nextSrc !== item?.src;
+                nextLayout.customImages.push({ ...item, src: nextSrc });
+            }
+            if (!changed) {
+                nextLayout.customImages = layout.customImages;
+            }
+        }
+        return nextLayout;
+    };
+
+    if (userIndex !== -1) {
+        const user = { ...users[userIndex] };
+        const nextProfilePic = await migrateValue(user.profilePic || "");
+        const nextBackgroundImage = await migrateValue(user.backgroundImage || "");
+        const nextProfileHistory = await migrateList(user.profileImageHistory || []);
+        const nextBackgroundHistory = await migrateList(user.backgroundImageHistory || []);
+        const nextLayout = await migrateLayout(user.mainPageLayout || getDefaultMainPageLayout());
+        const nextPresets = Array.isArray(user.mainPagePresets)
+            ? await Promise.all(user.mainPagePresets.map(async (preset) => preset ? ({ ...preset, layout: await migrateLayout(preset.layout || {}) }) : preset))
+            : user.mainPagePresets;
+
+        userChanged = nextProfilePic !== (user.profilePic || "")
+            || nextBackgroundImage !== (user.backgroundImage || "")
+            || nextProfileHistory !== user.profileImageHistory
+            || nextBackgroundHistory !== user.backgroundImageHistory
+            || nextLayout !== user.mainPageLayout
+            || nextPresets !== user.mainPagePresets;
+
+        if (userChanged) {
+            user.profilePic = nextProfilePic;
+            user.backgroundImage = nextBackgroundImage;
+            user.profileImageHistory = nextProfileHistory;
+            user.backgroundImageHistory = nextBackgroundHistory;
+            user.mainPageLayout = nextLayout;
+            user.mainPagePresets = nextPresets;
+            users[userIndex] = user;
+            saveUsers(users);
+        }
+    }
+
+    for (const track of musicState.library) {
+        const nextRecordArt = await migrateValue(track.customRecordArt || "");
+        const nextBackgroundArt = await migrateValue(track.customBackgroundArt || "");
+        if (nextRecordArt !== (track.customRecordArt || "") || nextBackgroundArt !== (track.customBackgroundArt || "")) {
+            track.customRecordArt = nextRecordArt;
+            track.customBackgroundArt = nextBackgroundArt;
+            musicChanged = true;
+        }
+    }
+
+    if (musicChanged) {
+        saveMusicState();
+    }
+
+    if (userChanged) {
+        const refreshedUser = getCurrentUser();
+        renderProfileImageLibrary(refreshedUser);
+        renderBackgroundImageLibrary(refreshedUser);
+        applyMainPageLayout(refreshedUser);
+        updateProfileDisplay(refreshedUser?.profilePic, refreshedUser?.profilePicCrop);
+        const wallpaperImage = pendingBackgroundImage !== null ? pendingBackgroundImage : (refreshedUser?.backgroundImage || "");
+        applySiteWallpaper(wallpaperImage, Boolean(applyHeaderWallpaperInput?.checked || refreshedUser?.applyHeaderWallpaper));
+    }
+
+    if (musicChanged) {
+        renderMusicUI();
+        renderLibraryPickerIfVisible();
+        applyRecordAppearance();
+        applyMusicTrackBackdrop();
+    }
 }
 
 async function saveTrackBlob(trackId, blob) {
@@ -5381,7 +5643,7 @@ async function deleteTrackBlob(trackId) {
 async function handleRecordInteraction() {
     const selectedTrack = getTrackById(musicState.selectedTrackId);
     if (!selectedTrack) {
-        alert("먼저 재생할 음악을 선택해주세요.");
+        alert("癒쇱? ?ъ깮???뚯븙???좏깮?댁＜?몄슂.");
         return;
     }
 
@@ -5425,7 +5687,7 @@ async function toggleCurrentPlayback(track) {
         try {
             await musicAudio.play();
         } catch {
-            alert("브라우저가 재생을 다시 시작하지 못했습니다. 다시 눌러주세요.");
+            alert("釉뚮씪?곗?媛 ?ъ깮???ㅼ떆 ?쒖옉?섏? 紐삵뻽?듬땲?? ?ㅼ떆 ?뚮윭二쇱꽭??");
         }
     }
 
@@ -5435,7 +5697,7 @@ async function toggleCurrentPlayback(track) {
 async function playSelectedTrack() {
     const selectedTrack = getTrackById(musicState.selectedTrackId);
     if (!selectedTrack) {
-        alert("먼저 재생할 음악을 선택해주세요.");
+        alert("癒쇱? ?ъ깮???뚯븙???좏깮?댁＜?몄슂.");
         return;
     }
 
@@ -5453,7 +5715,7 @@ async function playSelectedTrack() {
 
     const blob = await getTrackBlob(selectedTrack.id);
     if (!blob) {
-        alert("음악 파일을 불러오지 못했습니다.");
+        alert("?뚯븙 ?뚯씪??遺덈윭?ㅼ? 紐삵뻽?듬땲??");
         return;
     }
 
@@ -5465,7 +5727,7 @@ async function playSelectedTrack() {
     try {
         await musicAudio.play();
     } catch {
-        alert("브라우저가 재생을 시작하지 못했습니다. 다시 눌러주세요.");
+        alert("釉뚮씪?곗?媛 ?ъ깮???쒖옉?섏? 紐삵뻽?듬땲?? ?ㅼ떆 ?뚮윭二쇱꽭??");
     }
 
     syncPlaybackUi();
@@ -5477,7 +5739,7 @@ async function playYoutubeTrack(track) {
 
     const player = await ensureYoutubePlayer();
     if (!player) {
-        alert("유튜브 플레이어를 불러오지 못했습니다.");
+        alert("?좏뒠釉??뚮젅?댁뼱瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??");
         return;
     }
 
@@ -5496,14 +5758,14 @@ function handleYoutubeStateChange(event) {
 
     if (event.data === window.YT.PlayerState.PLAYING || event.data === window.YT.PlayerState.PAUSED) {
         syncPlaybackUi();
-        // 유튜브 소스 일시정지 시 배경 영상도 즉시 해당 시간으로 동기화 후 정지
+        // ?좏뒠釉??뚯뒪 ?쇱떆?뺤? ??諛곌꼍 ?곸긽??利됱떆 ?대떦 ?쒓컙?쇰줈 ?숆린?????뺤?
         if (event.data === window.YT.PlayerState.PAUSED) {
             forceSyncMusicBackgroundVideoTime();
             if (musicBackgroundVideoPlayer && typeof musicBackgroundVideoPlayer.pauseVideo === "function") {
                 try { musicBackgroundVideoPlayer.pauseVideo(); } catch (e) { /* ignore */ }
             }
         }
-        // 유튜브 소스 재생 재개 시 배경 영상도 시간 맞춰 재개
+        // ?좏뒠釉??뚯뒪 ?ъ깮 ?ш컻 ??諛곌꼍 ?곸긽???쒓컙 留욎떠 ?ш컻
         if (event.data === window.YT.PlayerState.PLAYING) {
             forceSyncMusicBackgroundVideoTime();
             if (musicBackgroundVideoPlayer && typeof musicBackgroundVideoPlayer.playVideo === "function") {
@@ -5534,13 +5796,13 @@ function updatePlaybackTexts() {
     const isPaused = isPlaybackPaused();
 
     recordHint.textContent = selectedTrack
-        ? `선택된 음악: ${selectedTrack.name}`
-        : "재생할 음악을 선택한 뒤 음반을 눌러주세요";
+        ? `?좏깮???뚯븙: ${selectedTrack.name}`
+        : "?ъ깮???뚯븙???좏깮?????뚮컲???뚮윭二쇱꽭??;
 
     if (playingTrack) {
-        nowPlayingTitle.textContent = `${isPaused ? "일시정지:" : "재생 중:"} ${playingTrack.name}`;
+        nowPlayingTitle.textContent = `${isPaused ? "?쇱떆?뺤?:" : "?ъ깮 以?"} ${playingTrack.name}`;
     } else {
-        nowPlayingTitle.textContent = "재생 중인 음악 없음";
+        nowPlayingTitle.textContent = "?ъ깮 以묒씤 ?뚯븙 ?놁쓬";
     }
 }
 
@@ -5578,8 +5840,7 @@ function startPlaybackMonitor() {
     playbackMonitorInterval = setInterval(() => {
         updatePlaybackControls();
         updatePlaybackProgressUi();
-        // 유튜브 소스 음악은 timeupdate 이벤트가 없으므로 여기서 주기적으로 동기화
-        if (isPlaybackActive()) {
+        // ?좏뒠釉??뚯뒪 ?뚯븙? timeupdate ?대깽?멸? ?놁쑝誘濡??ш린??二쇨린?곸쑝濡??숆린??        if (isPlaybackActive()) {
             syncMusicBackgroundVideoTime();
         }
     }, 500);
@@ -5675,7 +5936,7 @@ function applyPlaybackScrub() {
     seekPlayback(nextTime);
     isScrubbingPlayback = false;
     updatePlaybackProgressUi();
-    // 손을 뗀 직후 배경 영상 시간을 정확한 위치로 한 번만 맞춤
+    // ?먯쓣 ? 吏곹썑 諛곌꼍 ?곸긽 ?쒓컙???뺥솗???꾩튂濡???踰덈쭔 留욎땄
     forceSyncMusicBackgroundVideoTime();
 }
 
@@ -5687,15 +5948,14 @@ function seekPlayback(nextTime) {
         if (youtubePlayer && typeof youtubePlayer.seekTo === "function") {
             youtubePlayer.seekTo(nextTime, true);
         }
-        // 유튜브 소스는 musicAudio.seeked 이벤트가 없으므로 debounce된 강제 동기화 사용
+        // ?좏뒠釉??뚯뒪??musicAudio.seeked ?대깽?멸? ?놁쑝誘濡?debounce??媛뺤젣 ?숆린???ъ슜
         forceSyncMusicBackgroundVideoTime();
         return;
     }
 
     if (musicAudio.src) {
         musicAudio.currentTime = nextTime;
-        // musicAudio.seeked 이벤트가 발생하면 forceSyncMusicBackgroundVideoTime이 호출됨
-    }
+        // musicAudio.seeked ?대깽?멸? 諛쒖깮?섎㈃ forceSyncMusicBackgroundVideoTime???몄텧??    }
 }
 
 function toggleRepeatMode() {
@@ -5733,6 +5993,24 @@ async function restartCurrentTrack() {
     if (!playingTrack) return;
 
     musicState.selectedTrackId = playingTrack.id;
+    lastAppliedMusicBackgroundVideoConfig = "";
+    clearTimeout(musicBackgroundVideoFreezeTimer);
+    musicBackgroundVideoFreezeTimer = null;
+
+    const backgroundVideoStart = Math.max(0, Number(playingTrack.customBackgroundVideoStart || 0));
+    if (playingTrack.customBackgroundVideoId && musicBackgroundVideoPlayer) {
+        try {
+            if (typeof musicBackgroundVideoPlayer.seekTo === "function") {
+                musicBackgroundVideoPlayer.seekTo(backgroundVideoStart, true);
+            }
+            if (typeof musicBackgroundVideoPlayer.playVideo === "function") {
+                musicBackgroundVideoPlayer.playVideo();
+            }
+        } catch (error) {
+            console.warn("Failed to restart music background video", error);
+        }
+    }
+
     if (playingTrack.sourceType === "youtube") {
         const player = await ensureYoutubePlayer();
         if (!player) return;
@@ -5743,7 +6021,7 @@ async function restartCurrentTrack() {
         try {
             await musicAudio.play();
         } catch {
-            alert("반복 재생을 시작하지 못했습니다. 다시 눌러주세요.");
+            alert("諛섎났 ?ъ깮???쒖옉?섏? 紐삵뻽?듬땲?? ?ㅼ떆 ?뚮윭二쇱꽭??");
         }
     }
 
@@ -5825,7 +6103,7 @@ function renderPlaylist() {
             item.textContent = "-";
         } else {
             const track = getTrackById(trackIds[index]);
-            item.textContent = track ? track.name : "알 수 없는 음악";
+            item.textContent = track ? track.name : "?????녿뒗 ?뚯븙";
 
             if (role === "selected") item.classList.add("is-selected");
             if (role === "prev") item.classList.add("is-prev");
@@ -5859,13 +6137,13 @@ function updatePlaybackTexts() {
     const isPaused = isPlaybackPaused();
 
     recordHint.textContent = selectedTrack
-        ? `선택된 음악: ${selectedTrack.name}`
-        : "재생할 음악을 선택한 뒤 음반을 눌러주세요";
+        ? `?좏깮???뚯븙: ${selectedTrack.name}`
+        : "?ъ깮???뚯븙???좏깮?????뚮컲???뚮윭二쇱꽭??;
 
     if (playingTrack) {
-        nowPlayingTitle.textContent = `${isPaused ? "일시정지:" : "재생 중:"} ${playingTrack.name}`;
+        nowPlayingTitle.textContent = `${isPaused ? "?쇱떆?뺤?:" : "?ъ깮 以?"} ${playingTrack.name}`;
     } else {
-        nowPlayingTitle.textContent = "재생 중인 음악 없음";
+        nowPlayingTitle.textContent = "?ъ깮 以묒씤 ?뚯븙 ?놁쓬";
     }
 }
 
@@ -5876,7 +6154,7 @@ function renderLibraryPicker() {
     if (!musicState.library.length) {
         const empty = document.createElement("div");
         empty.className = "playlist-edit-subtitle";
-        empty.textContent = "보관함에 추가된 노래가 아직 없습니다.";
+        empty.textContent = "蹂닿??⑥뿉 異붽????몃옒媛 ?꾩쭅 ?놁뒿?덈떎.";
         libraryPickerList.appendChild(empty);
         return;
     }
@@ -5889,7 +6167,7 @@ function renderLibraryPicker() {
         meta.className = "playlist-edit-meta";
         meta.innerHTML = `
             <div class="playlist-edit-title">${track.name}</div>
-            <div class="library-picker-type">${track.sourceType === "youtube" ? "유튜브 링크" : "mp3 파일"}</div>
+            <div class="library-picker-type">${track.sourceType === "youtube" ? "?좏뒠釉?留곹겕" : "mp3 ?뚯씪"}</div>
         `;
 
         const actions = document.createElement("div");
@@ -5898,7 +6176,7 @@ function renderLibraryPicker() {
         const artBtn = document.createElement("button");
         artBtn.type = "button";
         artBtn.className = "mini-btn";
-        artBtn.title = "이 곡 음반 이미지 업로드";
+        artBtn.title = "??怨??뚮컲 ?대?吏 ?낅줈??;
         artBtn.innerHTML = '<i class="fa-solid fa-compact-disc"></i>';
         artBtn.onclick = () => requestTrackArtUpload(track.id);
 
@@ -5906,7 +6184,7 @@ function renderLibraryPicker() {
         addBtn.type = "button";
         addBtn.className = "nav-btn";
         const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
-        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
+        addBtn.textContent = alreadyAdded ? "異붽??? : "?ъ깮紐⑸줉??異붽?";
         addBtn.disabled = alreadyAdded;
         addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
 
@@ -6378,19 +6656,20 @@ function requestTrackArtUpload(trackId) {
     trackArtInput.click();
 }
 
-function handleTrackArtUpload(event) {
+async function handleTrackArtUpload(event) {
     const file = event.target.files?.[0];
     const targetTrack = getTrackById(pendingTrackArtTargetId);
     if (!file || !targetTrack) return;
     if (file.size > MAX_TRACK_ART_SIZE) {
-        alert("음반 이미지는 1.5MB 이하만 업로드할 수 있습니다. 이미지 크기를 줄여서 다시 시도해주세요.");
+        alert("음반 이미지는 6MB 이하만 업로드할 수 있습니다. 이미지 크기를 줄여서 다시 시도해주세요.");
         return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
+    try {
+        const imageData = await readFileAsDataUrl(file);
+        const storedImage = await saveImageAsset(imageData);
         const previousArt = targetTrack.customRecordArt || "";
-        targetTrack.customRecordArt = String(reader.result || "");
+        targetTrack.customRecordArt = storedImage;
 
         if (!saveMusicState()) {
             targetTrack.customRecordArt = previousArt;
@@ -6403,8 +6682,10 @@ function handleTrackArtUpload(event) {
         if (!recordStyleModal.classList.contains("hidden") && musicState.selectedTrackId === targetTrack.id) {
             renderRecordStyleOptions();
         }
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+        console.warn("Failed to load record art", error);
+        alert("음반 이미지를 불러오지 못했습니다. 다시 시도해주세요.");
+    }
 }
 
 function requestTrackBackgroundUpload(trackId) {
@@ -6420,7 +6701,7 @@ function requestTrackBackgroundVideo(trackId) {
     const currentUrl = track.customBackgroundVideoId
         ? `https://www.youtube.com/watch?v=${track.customBackgroundVideoId}`
         : "";
-    const input = prompt("배경으로 사용할 유튜브 링크를 입력해 주세요.", currentUrl);
+    const input = prompt("諛곌꼍?쇰줈 ?ъ슜???좏뒠釉?留곹겕瑜??낅젰??二쇱꽭??", currentUrl);
     if (input === null) return;
 
     const trimmed = input.trim();
@@ -6434,7 +6715,7 @@ function requestTrackBackgroundVideo(trackId) {
 
     const youtubeId = extractYouTubeId(trimmed);
     if (!youtubeId) {
-        alert("올바른 유튜브 링크를 입력해 주세요.");
+        alert("?щ컮瑜??좏뒠釉?留곹겕瑜??낅젰??二쇱꽭??");
         return;
     }
 
@@ -6445,33 +6726,36 @@ function requestTrackBackgroundVideo(trackId) {
     renderLibraryPickerIfVisible();
 }
 
-function handleTrackBackgroundUpload(event) {
+async function handleTrackBackgroundUpload(event) {
     const file = event.target.files?.[0];
     const targetTrack = getTrackById(pendingTrackBackgroundTargetId);
     if (!file || !targetTrack) return;
     if (file.size > MAX_TRACK_BACKGROUND_SIZE) {
-        alert("배경 이미지는 4MB 이하만 업로드할 수 있습니다.");
+        alert("배경 이미지는 16MB 이하만 업로드할 수 있습니다.");
         return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
+    try {
+        const imageData = await readFileAsDataUrl(file);
+        const storedImage = await saveImageAsset(imageData);
         const previousArt = targetTrack.customBackgroundArt || "";
         const previousVideoId = targetTrack.customBackgroundVideoId || "";
-        targetTrack.customBackgroundArt = String(reader.result || "");
+        targetTrack.customBackgroundArt = storedImage;
         targetTrack.customBackgroundVideoId = "";
 
         if (!saveMusicState()) {
             targetTrack.customBackgroundArt = previousArt;
             targetTrack.customBackgroundVideoId = previousVideoId;
-            alert("배경 이미지 저장에 실패했습니다. 파일 크기를 줄이거나 브라우저 저장 공간을 확인해주세요.");
+            alert("배경 이미지 저장에 실패했습니다. 파일 크기나 저장 공간을 확인해주세요.");
             return;
         }
 
         renderMusicUI();
         renderLibraryPickerIfVisible();
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+        console.warn("Failed to load background art", error);
+        alert("배경 이미지를 불러오지 못했습니다. 다시 시도해주세요.");
+    }
 }
 
 function toggleTrackRotation(trackId) {
@@ -6487,7 +6771,7 @@ async function deleteTrackFromLibrary(trackId) {
     const track = getTrackById(trackId);
     if (!track) return;
 
-    const confirmed = confirm(`'${track.name}' 곡을 보관함에서 영구적으로 삭제할까요?`);
+    const confirmed = confirm(`'${track.name}' 怨≪쓣 蹂닿??⑥뿉???곴뎄?곸쑝濡???젣?좉퉴??`);
     if (!confirmed) return;
 
     if (musicState.playingTrackId === trackId) {
@@ -6532,7 +6816,7 @@ function renderLibraryPicker() {
     if (!musicState.library.length) {
         const empty = document.createElement("div");
         empty.className = "playlist-edit-subtitle";
-        empty.textContent = "보관함에 추가된 노래가 아직 없습니다.";
+        empty.textContent = "蹂닿??⑥뿉 異붽????몃옒媛 ?꾩쭅 ?놁뒿?덈떎.";
         libraryPickerList.appendChild(empty);
         return;
     }
@@ -6545,7 +6829,7 @@ function renderLibraryPicker() {
         meta.className = "playlist-edit-meta";
         meta.innerHTML = `
             <div class="playlist-edit-title">${track.name}</div>
-            <div class="library-picker-type">${track.sourceType === "youtube" ? "유튜브 링크" : "mp3 파일"}</div>
+            <div class="library-picker-type">${track.sourceType === "youtube" ? "?좏뒠釉?留곹겕" : "mp3 ?뚯씪"}</div>
         `;
 
         const actions = document.createElement("div");
@@ -6554,21 +6838,21 @@ function renderLibraryPicker() {
         const rotateBtn = document.createElement("button");
         rotateBtn.type = "button";
         rotateBtn.className = "mini-btn";
-        rotateBtn.title = "음반 회전 켜기 또는 끄기";
+        rotateBtn.title = "?뚮컲 ?뚯쟾 耳쒓린 ?먮뒗 ?꾧린";
         rotateBtn.innerHTML = `<i class="fa-solid ${track.rotateRecord === false ? "fa-circle-stop" : "fa-rotate"}"></i>`;
         rotateBtn.onclick = () => toggleTrackRotation(track.id);
 
         const artBtn = document.createElement("button");
         artBtn.type = "button";
         artBtn.className = "mini-btn";
-        artBtn.title = "곡 전용 음반 이미지";
+        artBtn.title = "怨??꾩슜 ?뚮컲 ?대?吏";
         artBtn.innerHTML = '<i class="fa-solid fa-compact-disc"></i>';
         artBtn.onclick = () => requestTrackArtUpload(track.id);
 
         const backgroundBtn = document.createElement("button");
         backgroundBtn.type = "button";
         backgroundBtn.className = "mini-btn";
-        backgroundBtn.title = "곡 전용 배경 이미지";
+        backgroundBtn.title = "怨??꾩슜 諛곌꼍 ?대?吏";
         backgroundBtn.innerHTML = '<i class="fa-solid fa-image"></i>';
         backgroundBtn.onclick = () => requestTrackBackgroundUpload(track.id);
 
@@ -6576,14 +6860,14 @@ function renderLibraryPicker() {
         addBtn.type = "button";
         addBtn.className = "nav-btn";
         const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
-        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
+        addBtn.textContent = alreadyAdded ? "異붽??? : "?ъ깮紐⑸줉??異붽?";
         addBtn.disabled = alreadyAdded;
         addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
 
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
         deleteBtn.className = "mini-btn";
-        deleteBtn.title = "보관함에서 영구 삭제";
+        deleteBtn.title = "蹂닿??⑥뿉???곴뎄 ??젣";
         deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
         deleteBtn.onclick = () => deleteTrackFromLibrary(track.id);
 
@@ -6614,6 +6898,7 @@ function applyRecordAppearance() {
     const activeTrack = getTrackForMusicVisuals();
     const styleId = getEffectiveRecordStyle(activeTrack);
     const effectId = musicState.recordEffect || "none";
+    const applyToken = ++recordAppearanceToken;
 
     clearRecordStyleClasses(recordDisc);
     recordDisc.style.removeProperty("--custom-record-art");
@@ -6621,8 +6906,11 @@ function applyRecordAppearance() {
     applyRecordEffectClasses(recordDisc, effectId);
 
     if (activeTrack?.customRecordArt) {
-        const recordArtValue = `url("${activeTrack.customRecordArt}")`;
-        recordDisc.style.setProperty("--custom-record-art", recordArtValue);
+        resolveImageAsset(activeTrack.customRecordArt).then((resolvedArt) => {
+            if (applyToken !== recordAppearanceToken || !resolvedArt) return;
+            const recordArtValue = `url("${resolvedArt}")`;
+            recordDisc.style.setProperty("--custom-record-art", recordArtValue);
+        });
     }
 
     applyGlobalRecordPreview();
@@ -6747,7 +7035,7 @@ function renderLibraryPicker() {
     if (!musicState.library.length) {
         const empty = document.createElement("div");
         empty.className = "playlist-edit-subtitle";
-        empty.textContent = "보관함에 추가된 노래가 아직 없습니다.";
+        empty.textContent = "蹂닿??⑥뿉 異붽????몃옒媛 ?꾩쭅 ?놁뒿?덈떎.";
         libraryPickerList.appendChild(empty);
         return;
     }
@@ -6757,17 +7045,17 @@ function renderLibraryPicker() {
         row.className = "library-picker-item";
 
         const recordStatus = track.customRecordArt
-            ? (activeTrackId === track.id ? "현재 음반 이미지 사용 중" : "음반 이미지 설정됨")
-            : "음반 이미지 없음";
+            ? (activeTrackId === track.id ? "?꾩옱 ?뚮컲 ?대?吏 ?ъ슜 以? : "?뚮컲 ?대?吏 ?ㅼ젙??)
+            : "?뚮컲 ?대?吏 ?놁쓬";
         const backgroundStatus = track.customBackgroundArt
-            ? (activeTrackId === track.id ? "현재 배경 사용 중" : "배경 이미지 설정됨")
-            : "배경 이미지 없음";
+            ? (activeTrackId === track.id ? "?꾩옱 諛곌꼍 ?ъ슜 以? : "諛곌꼍 ?대?吏 ?ㅼ젙??)
+            : "諛곌꼍 ?대?吏 ?놁쓬";
 
         const meta = document.createElement("div");
         meta.className = "playlist-edit-meta";
         meta.innerHTML = `
             <div class="playlist-edit-title">${track.name}</div>
-            <div class="library-picker-type">${track.sourceType === "youtube" ? "유튜브 링크" : "mp3 파일"}</div>
+            <div class="library-picker-type">${track.sourceType === "youtube" ? "?좏뒠釉?留곹겕" : "mp3 ?뚯씪"}</div>
             <div class="playlist-edit-subtitle">${recordStatus}</div>
             <div class="playlist-edit-subtitle">${backgroundStatus}</div>
         `;
@@ -6778,21 +7066,21 @@ function renderLibraryPicker() {
         const rotateBtn = document.createElement("button");
         rotateBtn.type = "button";
         rotateBtn.className = "mini-btn";
-        rotateBtn.title = "음반 회전 켜기 또는 끄기";
+        rotateBtn.title = "?뚮컲 ?뚯쟾 耳쒓린 ?먮뒗 ?꾧린";
         rotateBtn.innerHTML = `<i class="fa-solid ${track.rotateRecord === false ? "fa-circle-stop" : "fa-rotate"}"></i>`;
         rotateBtn.onclick = () => toggleTrackRotation(track.id);
 
         const artBtn = document.createElement("button");
         artBtn.type = "button";
         artBtn.className = "mini-btn";
-        artBtn.title = "곡 전용 음반 이미지 설정";
+        artBtn.title = "怨??꾩슜 ?뚮컲 ?대?吏 ?ㅼ젙";
         artBtn.innerHTML = '<i class="fa-solid fa-compact-disc"></i>';
         artBtn.onclick = () => requestTrackArtUpload(track.id);
 
         const clearArtBtn = document.createElement("button");
         clearArtBtn.type = "button";
         clearArtBtn.className = "mini-btn";
-        clearArtBtn.title = "음반 이미지 삭제";
+        clearArtBtn.title = "?뚮컲 ?대?吏 ??젣";
         clearArtBtn.innerHTML = '<i class="fa-solid fa-eraser"></i>';
         clearArtBtn.disabled = !track.customRecordArt;
         clearArtBtn.onclick = () => clearTrackRecordArt(track.id);
@@ -6800,14 +7088,14 @@ function renderLibraryPicker() {
         const backgroundBtn = document.createElement("button");
         backgroundBtn.type = "button";
         backgroundBtn.className = "mini-btn";
-        backgroundBtn.title = "곡 전용 배경 이미지 설정";
+        backgroundBtn.title = "怨??꾩슜 諛곌꼍 ?대?吏 ?ㅼ젙";
         backgroundBtn.innerHTML = '<i class="fa-solid fa-image"></i>';
         backgroundBtn.onclick = () => requestTrackBackgroundUpload(track.id);
 
         const clearBackgroundBtn = document.createElement("button");
         clearBackgroundBtn.type = "button";
         clearBackgroundBtn.className = "mini-btn";
-        clearBackgroundBtn.title = "배경 이미지 삭제";
+        clearBackgroundBtn.title = "諛곌꼍 ?대?吏 ??젣";
         clearBackgroundBtn.innerHTML = '<i class="fa-solid fa-trash-can-arrow-up"></i>';
         clearBackgroundBtn.disabled = !track.customBackgroundArt;
         clearBackgroundBtn.onclick = () => clearTrackBackgroundArt(track.id);
@@ -6816,14 +7104,14 @@ function renderLibraryPicker() {
         addBtn.type = "button";
         addBtn.className = "nav-btn";
         const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
-        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
+        addBtn.textContent = alreadyAdded ? "異붽??? : "?ъ깮紐⑸줉??異붽?";
         addBtn.disabled = alreadyAdded;
         addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
 
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
         deleteBtn.className = "mini-btn";
-        deleteBtn.title = "보관함에서 영구 삭제";
+        deleteBtn.title = "蹂닿??⑥뿉???곴뎄 ??젣";
         deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
         deleteBtn.onclick = () => deleteTrackFromLibrary(track.id);
 
@@ -6843,11 +7131,11 @@ async function saveMusicTrack() {
         const youtubeUrl = youtubeLinkInput.value.trim();
         const youtubeId = extractYouTubeId(youtubeUrl);
         if (!youtubeId) {
-            alert("?щ컮瑜??좏뒠釉?留곹겕瑜??낅젰?댁＜?몄슂.");
+            alert("??而?몴??醫뤿뮔??筌띻낱寃뺟몴???낆젾??곻폒?紐꾩뒄.");
             return;
         }
 
-        const resolvedTitle = customTitle || await fetchYouTubeVideoTitle(youtubeUrl) || "유튜브 음악";
+        const resolvedTitle = customTitle || await fetchYouTubeVideoTitle(youtubeUrl) || "?좏뒠釉??뚯븙";
         const trackId = createId("track");
         musicState.library.push(normalizeTrackData({
             id: trackId,
@@ -6860,7 +7148,7 @@ async function saveMusicTrack() {
     } else {
         const file = musicFileInput.files[0];
         if (!file) {
-            alert("추가할 mp3 파일을 선택해 주세요.");
+            alert("異붽???mp3 ?뚯씪???좏깮??二쇱꽭??");
             return;
         }
 
@@ -6887,12 +7175,12 @@ function renameTrackInLibrary(trackId) {
     const track = getTrackById(trackId);
     if (!track) return;
 
-    const nextName = prompt("노래 이름을 수정해 주세요.", track.name || "");
+    const nextName = prompt("?몃옒 ?대쫫???섏젙??二쇱꽭??", track.name || "");
     if (nextName === null) return;
 
     const trimmed = nextName.trim();
     if (!trimmed) {
-        alert("노래 이름은 비워둘 수 없습니다.");
+        alert("?몃옒 ?대쫫? 鍮꾩썙?????놁뒿?덈떎.");
         return;
     }
 
@@ -6912,7 +7200,7 @@ function renderLibraryPicker() {
     if (!musicState.library.length) {
         const empty = document.createElement("div");
         empty.className = "playlist-edit-subtitle";
-        empty.textContent = "보관함에 추가된 노래가 아직 없습니다.";
+        empty.textContent = "蹂닿??⑥뿉 異붽????몃옒媛 ?꾩쭅 ?놁뒿?덈떎.";
         libraryPickerList.appendChild(empty);
         return;
     }
@@ -6922,17 +7210,17 @@ function renderLibraryPicker() {
         row.className = "library-picker-item";
 
         const recordStatus = track.customRecordArt
-            ? (activeTrackId === track.id ? "현재 음반 이미지 사용 중" : "음반 이미지 설정됨")
-            : "음반 이미지 없음";
+            ? (activeTrackId === track.id ? "?꾩옱 ?뚮컲 ?대?吏 ?ъ슜 以? : "?뚮컲 ?대?吏 ?ㅼ젙??)
+            : "?뚮컲 ?대?吏 ?놁쓬";
         const backgroundStatus = track.customBackgroundArt
-            ? (activeTrackId === track.id ? "현재 배경 사용 중" : "배경 이미지 설정됨")
-            : "배경 이미지 없음";
+            ? (activeTrackId === track.id ? "?꾩옱 諛곌꼍 ?ъ슜 以? : "諛곌꼍 ?대?吏 ?ㅼ젙??)
+            : "諛곌꼍 ?대?吏 ?놁쓬";
 
         const meta = document.createElement("div");
         meta.className = "playlist-edit-meta";
         meta.innerHTML = `
             <div class="playlist-edit-title">${track.name}</div>
-            <div class="library-picker-type">${track.sourceType === "youtube" ? "유튜브 링크" : "mp3 파일"}</div>
+            <div class="library-picker-type">${track.sourceType === "youtube" ? "?좏뒠釉?留곹겕" : "mp3 ?뚯씪"}</div>
             <div class="playlist-edit-subtitle">${recordStatus}</div>
             <div class="playlist-edit-subtitle">${backgroundStatus}</div>
         `;
@@ -6943,28 +7231,28 @@ function renderLibraryPicker() {
         const renameBtn = document.createElement("button");
         renameBtn.type = "button";
         renameBtn.className = "mini-btn";
-        renameBtn.title = "노래 이름 수정";
+        renameBtn.title = "?몃옒 ?대쫫 ?섏젙";
         renameBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
         renameBtn.onclick = () => renameTrackInLibrary(track.id);
 
         const rotateBtn = document.createElement("button");
         rotateBtn.type = "button";
         rotateBtn.className = "mini-btn";
-        rotateBtn.title = "음반 회전 켜기 또는 끄기";
+        rotateBtn.title = "?뚮컲 ?뚯쟾 耳쒓린 ?먮뒗 ?꾧린";
         rotateBtn.innerHTML = `<i class="fa-solid ${track.rotateRecord === false ? "fa-circle-stop" : "fa-rotate"}"></i>`;
         rotateBtn.onclick = () => toggleTrackRotation(track.id);
 
         const artBtn = document.createElement("button");
         artBtn.type = "button";
         artBtn.className = "mini-btn";
-        artBtn.title = "곡 전용 음반 이미지 설정";
+        artBtn.title = "怨??꾩슜 ?뚮컲 ?대?吏 ?ㅼ젙";
         artBtn.innerHTML = '<i class="fa-solid fa-compact-disc"></i>';
         artBtn.onclick = () => requestTrackArtUpload(track.id);
 
         const clearArtBtn = document.createElement("button");
         clearArtBtn.type = "button";
         clearArtBtn.className = "mini-btn";
-        clearArtBtn.title = "음반 이미지 삭제";
+        clearArtBtn.title = "?뚮컲 ?대?吏 ??젣";
         clearArtBtn.innerHTML = '<i class="fa-solid fa-eraser"></i>';
         clearArtBtn.disabled = !track.customRecordArt;
         clearArtBtn.onclick = () => clearTrackRecordArt(track.id);
@@ -6972,14 +7260,14 @@ function renderLibraryPicker() {
         const backgroundBtn = document.createElement("button");
         backgroundBtn.type = "button";
         backgroundBtn.className = "mini-btn";
-        backgroundBtn.title = "곡 전용 배경 이미지 설정";
+        backgroundBtn.title = "怨??꾩슜 諛곌꼍 ?대?吏 ?ㅼ젙";
         backgroundBtn.innerHTML = '<i class="fa-solid fa-image"></i>';
         backgroundBtn.onclick = () => requestTrackBackgroundUpload(track.id);
 
         const clearBackgroundBtn = document.createElement("button");
         clearBackgroundBtn.type = "button";
         clearBackgroundBtn.className = "mini-btn";
-        clearBackgroundBtn.title = "배경 이미지 삭제";
+        clearBackgroundBtn.title = "諛곌꼍 ?대?吏 ??젣";
         clearBackgroundBtn.innerHTML = '<i class="fa-solid fa-trash-can-arrow-up"></i>';
         clearBackgroundBtn.disabled = !track.customBackgroundArt;
         clearBackgroundBtn.onclick = () => clearTrackBackgroundArt(track.id);
@@ -6988,14 +7276,14 @@ function renderLibraryPicker() {
         addBtn.type = "button";
         addBtn.className = "nav-btn";
         const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
-        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
+        addBtn.textContent = alreadyAdded ? "異붽??? : "?ъ깮紐⑸줉??異붽?";
         addBtn.disabled = alreadyAdded;
         addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
 
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
         deleteBtn.className = "mini-btn";
-        deleteBtn.title = "보관함에서 영구 삭제";
+        deleteBtn.title = "蹂닿??⑥뿉???곴뎄 ??젣";
         deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
         deleteBtn.onclick = () => deleteTrackFromLibrary(track.id);
 
@@ -7113,13 +7401,13 @@ async function saveVideoEntry() {
     const youtubeUrl = videoLinkInput.value.trim();
     const youtubeId = extractYouTubeId(youtubeUrl);
     if (!youtubeId) {
-        alert("올바른 유튜브 링크를 입력해주세요.");
+        alert("?щ컮瑜??좏뒠釉?留곹겕瑜??낅젰?댁＜?몄슂.");
         return;
     }
 
     let title = videoTitleInput.value.trim();
     if (!title) {
-        title = await fetchYouTubeVideoTitle(youtubeUrl) || "유튜브 영상";
+        title = await fetchYouTubeVideoTitle(youtubeUrl) || "?좏뒠釉??곸긽";
     }
 
     videoState.library.unshift({
@@ -7164,7 +7452,7 @@ function renderVideoTrashList() {
     if (!videoState.trash?.length) {
         const empty = document.createElement("div");
         empty.className = "playlist-edit-subtitle";
-        empty.textContent = "휴지통에 영상이 없습니다.";
+        empty.textContent = "?댁??듭뿉 ?곸긽???놁뒿?덈떎.";
         videoTrashList.appendChild(empty);
         return;
     }
@@ -7176,9 +7464,9 @@ function renderVideoTrashList() {
         const meta = document.createElement("div");
         meta.className = "playlist-edit-meta";
         meta.innerHTML = `
-            <div class="playlist-edit-title">${escapeHtml(video.title || "이름 없는 영상")}</div>
-            <div class="playlist-edit-subtitle">${escapeHtml(video.description || "설명 없음")}</div>
-            <div class="library-picker-type">${(video.tags || []).length ? (video.tags || []).map((tag) => `#${escapeHtml(tag)}`).join(" ") : "태그 없음"}</div>
+            <div class="playlist-edit-title">${escapeHtml(video.title || "?대쫫 ?녿뒗 ?곸긽")}</div>
+            <div class="playlist-edit-subtitle">${escapeHtml(video.description || "?ㅻ챸 ?놁쓬")}</div>
+            <div class="library-picker-type">${(video.tags || []).length ? (video.tags || []).map((tag) => `#${escapeHtml(tag)}`).join(" ") : "?쒓렇 ?놁쓬"}</div>
         `;
 
         const actions = document.createElement("div");
@@ -7187,13 +7475,13 @@ function renderVideoTrashList() {
         const restoreBtn = document.createElement("button");
         restoreBtn.type = "button";
         restoreBtn.className = "nav-btn";
-        restoreBtn.textContent = "복구";
+        restoreBtn.textContent = "蹂듦뎄";
         restoreBtn.onclick = () => restoreVideoFromTrash(video.id);
 
         const purgeBtn = document.createElement("button");
         purgeBtn.type = "button";
         purgeBtn.className = "mini-btn";
-        purgeBtn.title = "영구 삭제";
+        purgeBtn.title = "?곴뎄 ??젣";
         purgeBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
         purgeBtn.onclick = () => deleteVideoPermanently(video.id);
 
@@ -7238,7 +7526,7 @@ function renderVideoGrid() {
             </div>
             <div class="video-card-body">
                 <div class="video-card-title">${escapeHtml(video.title)}</div>
-                <div class="video-card-description">${escapeHtml((video.description || "").slice(0, 80) || "설명이 없습니다.")}</div>
+                <div class="video-card-description">${escapeHtml((video.description || "").slice(0, 80) || "?ㅻ챸???놁뒿?덈떎.")}</div>
                 <div class="video-card-tags">${(video.tags || []).slice(0, 4).map((tag) => `<span class="video-card-tag">#${escapeHtml(tag)}</span>`).join("")}</div>
             </div>
         `;
@@ -7342,7 +7630,7 @@ function syncVideoViewer() {
 
     videoEditorTitle.value = currentVideo.title || "";
     videoEditorDescription.value = currentVideo.description || "";
-    miniVideoTitle.textContent = currentVideo.title || "영상 재생 중";
+    miniVideoTitle.textContent = currentVideo.title || "?곸긽 ?ъ깮 以?;
     renderCurrentVideoTags();
 
     if (videoState.isMiniPlayer) {
@@ -7364,7 +7652,7 @@ function renderCurrentVideoTags() {
     (currentVideo.tags || []).forEach((tag) => {
         const chip = document.createElement("span");
         chip.className = "video-current-tag";
-        chip.innerHTML = `#${escapeHtml(tag)} <button type="button" aria-label="태그 삭제"><i class="fa-solid fa-xmark"></i></button>`;
+        chip.innerHTML = `#${escapeHtml(tag)} <button type="button" aria-label="?쒓렇 ??젣"><i class="fa-solid fa-xmark"></i></button>`;
         chip.querySelector("button").onclick = () => removeTagFromCurrentVideo(tag);
         videoCurrentTags.appendChild(chip);
     });
@@ -7389,7 +7677,7 @@ function deleteCurrentVideo() {
     const currentVideo = getCurrentVideo();
     if (!currentVideo) return;
 
-    const confirmed = confirm("정말 지우겠습니까?");
+    const confirmed = confirm("?뺣쭚 吏?곌쿋?듬땲源?");
     if (!confirmed) return;
 
     videoState.trash = [
@@ -7424,7 +7712,7 @@ function restoreVideoFromTrash(videoId) {
 }
 
 function deleteVideoPermanently(videoId) {
-    const confirmed = confirm("휴지통에서도 완전히 지우겠습니까?");
+    const confirmed = confirm("?댁??듭뿉?쒕룄 ?꾩쟾??吏?곌쿋?듬땲源?");
     if (!confirmed) return;
 
     videoState.trash = (videoState.trash || []).filter((video) => video.id !== videoId);
@@ -7557,7 +7845,7 @@ function syncVideoViewer() {
 
     videoEditorTitle.value = currentVideo.title || "";
     videoEditorDescription.value = currentVideo.description || "";
-    miniVideoTitle.textContent = currentVideo.title || "영상 재생 중";
+    miniVideoTitle.textContent = currentVideo.title || "?곸긽 ?ъ깮 以?;
     renderCurrentVideoTags();
 
     if (videoState.isMiniPlayer) {
@@ -7607,33 +7895,36 @@ if (typeof initTrackBackgroundVideoEditor === "function") {
     initTrackBackgroundVideoEditor();
 }
 
-function handleTrackBackgroundUpload(event) {
+async function handleTrackBackgroundUpload(event) {
     const file = event.target.files?.[0];
     const targetTrack = getTrackById(pendingTrackBackgroundTargetId);
     if (!file || !targetTrack) return;
     if (file.size > MAX_TRACK_BACKGROUND_SIZE) {
-        alert("배경 이미지는 4MB 이하만 업로드할 수 있습니다.");
+        alert("배경 이미지는 16MB 이하만 업로드할 수 있습니다.");
         return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
+    try {
+        const imageData = await readFileAsDataUrl(file);
+        const storedImage = await saveImageAsset(imageData);
         const previousArt = targetTrack.customBackgroundArt || "";
         const previousVideoId = targetTrack.customBackgroundVideoId || "";
-        targetTrack.customBackgroundArt = String(reader.result || "");
+        targetTrack.customBackgroundArt = storedImage;
         targetTrack.customBackgroundVideoId = "";
 
         if (!saveMusicState()) {
             targetTrack.customBackgroundArt = previousArt;
             targetTrack.customBackgroundVideoId = previousVideoId;
-            alert("배경 이미지 저장에 실패했습니다. 파일 크기를 줄이거나 브라우저 저장 공간을 확인해 주세요.");
+            alert("배경 이미지 저장에 실패했습니다. 파일 크기나 저장 공간을 확인해주세요.");
             return;
         }
 
         renderMusicUI();
         renderLibraryPickerIfVisible();
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+        console.warn("Failed to load background art", error);
+        alert("배경 이미지를 불러오지 못했습니다. 다시 시도해주세요.");
+    }
 }
 
 function clearTrackBackgroundArt(trackId) {
@@ -7765,7 +8056,7 @@ function renderLibraryPicker() {
     if (!musicState.library.length) {
         const empty = document.createElement("div");
         empty.className = "playlist-edit-subtitle";
-        empty.textContent = "보관함에 추가된 노래가 아직 없습니다.";
+        empty.textContent = "蹂닿??⑥뿉 異붽????몃옒媛 ?꾩쭅 ?놁뒿?덈떎.";
         libraryPickerList.appendChild(empty);
         return;
     }
@@ -7775,19 +8066,19 @@ function renderLibraryPicker() {
         row.className = "library-picker-item";
 
         const recordStatus = track.customRecordArt
-            ? (activeTrackId === track.id ? "현재 음반 이미지 사용 중" : "음반 이미지 설정됨")
-            : "음반 이미지 없음";
+            ? (activeTrackId === track.id ? "?꾩옱 ?뚮컲 ?대?吏 ?ъ슜 以? : "?뚮컲 ?대?吏 ?ㅼ젙??)
+            : "?뚮컲 ?대?吏 ?놁쓬";
         const backgroundStatus = track.customBackgroundVideoId
-            ? (activeTrackId === track.id ? "현재 배경 영상 사용 중" : "배경 영상 설정됨")
+            ? (activeTrackId === track.id ? "?꾩옱 諛곌꼍 ?곸긽 ?ъ슜 以? : "諛곌꼍 ?곸긽 ?ㅼ젙??)
             : track.customBackgroundArt
-                ? (activeTrackId === track.id ? "현재 배경 사용 중" : "배경 이미지 설정됨")
-                : "배경 없음";
+                ? (activeTrackId === track.id ? "?꾩옱 諛곌꼍 ?ъ슜 以? : "諛곌꼍 ?대?吏 ?ㅼ젙??)
+                : "諛곌꼍 ?놁쓬";
 
         const meta = document.createElement("div");
         meta.className = "playlist-edit-meta";
         meta.innerHTML = `
             <div class="playlist-edit-title">${track.name}</div>
-            <div class="library-picker-type">${track.sourceType === "youtube" ? "유튜브 링크" : "mp3 파일"}</div>
+            <div class="library-picker-type">${track.sourceType === "youtube" ? "?좏뒠釉?留곹겕" : "mp3 ?뚯씪"}</div>
             <div class="playlist-edit-subtitle">${recordStatus}</div>
             <div class="playlist-edit-subtitle">${backgroundStatus}</div>
         `;
@@ -7798,28 +8089,28 @@ function renderLibraryPicker() {
         const renameBtn = document.createElement("button");
         renameBtn.type = "button";
         renameBtn.className = "mini-btn";
-        renameBtn.title = "노래 이름 수정";
+        renameBtn.title = "?몃옒 ?대쫫 ?섏젙";
         renameBtn.innerHTML = '<i class="fa-solid fa-pen"></i>';
         renameBtn.onclick = () => renameTrackInLibrary(track.id);
 
         const rotateBtn = document.createElement("button");
         rotateBtn.type = "button";
         rotateBtn.className = "mini-btn";
-        rotateBtn.title = "음반 회전 켜기 또는 끄기";
+        rotateBtn.title = "?뚮컲 ?뚯쟾 耳쒓린 ?먮뒗 ?꾧린";
         rotateBtn.innerHTML = `<i class="fa-solid ${track.rotateRecord === false ? "fa-circle-stop" : "fa-rotate"}"></i>`;
         rotateBtn.onclick = () => toggleTrackRotation(track.id);
 
         const artBtn = document.createElement("button");
         artBtn.type = "button";
         artBtn.className = "mini-btn";
-        artBtn.title = "곡 전용 음반 이미지 설정";
+        artBtn.title = "怨??꾩슜 ?뚮컲 ?대?吏 ?ㅼ젙";
         artBtn.innerHTML = '<i class="fa-solid fa-compact-disc"></i>';
         artBtn.onclick = () => requestTrackArtUpload(track.id);
 
         const clearArtBtn = document.createElement("button");
         clearArtBtn.type = "button";
         clearArtBtn.className = "mini-btn";
-        clearArtBtn.title = "음반 이미지 삭제";
+        clearArtBtn.title = "?뚮컲 ?대?吏 ??젣";
         clearArtBtn.innerHTML = '<i class="fa-solid fa-eraser"></i>';
         clearArtBtn.disabled = !track.customRecordArt;
         clearArtBtn.onclick = () => clearTrackRecordArt(track.id);
@@ -7827,21 +8118,21 @@ function renderLibraryPicker() {
         const backgroundBtn = document.createElement("button");
         backgroundBtn.type = "button";
         backgroundBtn.className = "mini-btn";
-        backgroundBtn.title = "곡 전용 배경 이미지 설정";
+        backgroundBtn.title = "怨??꾩슜 諛곌꼍 ?대?吏 ?ㅼ젙";
         backgroundBtn.innerHTML = '<i class="fa-solid fa-image"></i>';
         backgroundBtn.onclick = () => requestTrackBackgroundUpload(track.id);
 
         const backgroundVideoBtn = document.createElement("button");
         backgroundVideoBtn.type = "button";
         backgroundVideoBtn.className = "mini-btn";
-        backgroundVideoBtn.title = "곡 전용 배경 영상 설정";
+        backgroundVideoBtn.title = "怨??꾩슜 諛곌꼍 ?곸긽 ?ㅼ젙";
         backgroundVideoBtn.innerHTML = '<i class="fa-brands fa-youtube"></i>';
         backgroundVideoBtn.onclick = () => requestTrackBackgroundVideo(track.id);
 
         const clearBackgroundBtn = document.createElement("button");
         clearBackgroundBtn.type = "button";
         clearBackgroundBtn.className = "mini-btn";
-        clearBackgroundBtn.title = "배경 삭제";
+        clearBackgroundBtn.title = "諛곌꼍 ??젣";
         clearBackgroundBtn.innerHTML = '<i class="fa-solid fa-trash-can-arrow-up"></i>';
         clearBackgroundBtn.disabled = !track.customBackgroundArt && !track.customBackgroundVideoId;
         clearBackgroundBtn.onclick = () => clearTrackBackgroundArt(track.id);
@@ -7850,14 +8141,14 @@ function renderLibraryPicker() {
         addBtn.type = "button";
         addBtn.className = "nav-btn";
         const alreadyAdded = Boolean(playlist && playlist.trackIds.includes(track.id));
-        addBtn.textContent = alreadyAdded ? "추가됨" : "재생목록에 추가";
+        addBtn.textContent = alreadyAdded ? "異붽??? : "?ъ깮紐⑸줉??異붽?";
         addBtn.disabled = alreadyAdded;
         addBtn.onclick = () => addTrackToCurrentPlaylist(track.id);
 
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
         deleteBtn.className = "mini-btn";
-        deleteBtn.title = "보관함에서 영구 삭제";
+        deleteBtn.title = "蹂닿??⑥뿉???곴뎄 ??젣";
         deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
         deleteBtn.onclick = () => deleteTrackFromLibrary(track.id);
 
@@ -7920,6 +8211,7 @@ applyMusicTrackBackdrop = async function() {
         ? pendingBackgroundImage
         : (currentUser?.backgroundImage || "");
     const applyHeaderWallpaper = Boolean(applyHeaderWallpaperInput?.checked || currentUser?.applyHeaderWallpaper);
+    const resolvedBackgroundArt = backgroundArt ? await resolveImageAsset(backgroundArt) : "";
     const backdropKey = backgroundVideoId
         ? `video:${backgroundVideoId}@${backgroundVideoStart}`
         : (backgroundArt ? `image:${backgroundArt}` : "");
@@ -7958,7 +8250,6 @@ applyMusicTrackBackdrop = async function() {
             musicVideoBackdrop.style.backgroundRepeat = "no-repeat";
         }
 
-        // YouTube IFrame API 플레이어를 사용해야 seekTo로 시간 동기화가 가능
         const player = await ensureMusicBackgroundVideoPlayer();
         if (player) {
             const videoConfig = `${backgroundVideoId}@${backgroundVideoStart}`;
@@ -7977,7 +8268,6 @@ applyMusicTrackBackdrop = async function() {
                 if (isTrackPlaying) {
                     if (typeof player.playVideo === "function") player.playVideo();
                 } else {
-                    // 로드 후 현재 음악 시간 위치에 정지
                     setTimeout(() => {
                         try {
                             if (typeof player.seekTo === "function") player.seekTo(targetStartTime, true);
@@ -7985,13 +8275,10 @@ applyMusicTrackBackdrop = async function() {
                         } catch (e) { /* ignore */ }
                     }, 400);
                 }
-            } else {
-                // 같은 영상 — 재생/정지 상태 전환
-                if (isTrackPlaying) {
-                    if (typeof player.playVideo === "function") player.playVideo();
-                } else {
-                    if (typeof player.pauseVideo === "function") player.pauseVideo();
-                }
+            } else if (isTrackPlaying) {
+                if (typeof player.playVideo === "function") player.playVideo();
+            } else if (typeof player.pauseVideo === "function") {
+                player.pauseVideo();
             }
         }
 
@@ -8010,14 +8297,22 @@ applyMusicTrackBackdrop = async function() {
         }
     } else {
         stopMusicBackgroundVideoPlayback();
+        if (!resolvedBackgroundArt) {
+            musicPage.classList.remove("has-track-background");
+            musicPage.style.setProperty("--music-track-bg-url", "none");
+            if (isMusicPageVisible) {
+                applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+            }
+            return;
+        }
         musicPage.classList.add("has-track-background");
-        musicPage.style.setProperty("--music-track-bg-url", `url("${backgroundArt}")`);
+        musicPage.style.setProperty("--music-track-bg-url", `url("${resolvedBackgroundArt}")`);
 
         if (isMusicPageVisible && applyMusicHeaderWallpaper) {
             pageHeader.style.setProperty("background-color", "#ffffff", "important");
             pageHeader.style.setProperty(
                 "background-image",
-                `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(${backgroundArt})`,
+                `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url("${resolvedBackgroundArt}")`,
                 "important"
             );
             pageHeader.style.setProperty("background-position", "center top", "important");
@@ -8034,3 +8329,197 @@ applyMusicTrackBackdrop = async function() {
         musicPage.classList.add("track-backdrop-refresh");
     }
 };
+
+renderProfileImageLibrary = async function(user = getCurrentUser()) {
+    if (!profileImageLibrary) return;
+    const items = Array.isArray(user?.profileImageHistory) ? user.profileImageHistory : [];
+    profileImageLibrary.innerHTML = "";
+    items.forEach((src) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "image-history-item";
+        const image = document.createElement("img");
+        image.alt = "profile";
+        setResolvedImageSource(image, src);
+        btn.appendChild(image);
+        btn.onclick = () => {
+            openProfileCropModal(src, pendingProfileCrop || user?.profilePicCrop || getDefaultProfileCrop());
+        };
+        profileImageLibrary.appendChild(btn);
+    });
+};
+
+renderBackgroundImageLibrary = async function(user = getCurrentUser()) {
+    if (!backgroundImageLibrary) return;
+    const items = Array.isArray(user?.backgroundImageHistory) ? user.backgroundImageHistory : [];
+    backgroundImageLibrary.innerHTML = "";
+    items.forEach((src) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "image-history-item";
+        const image = document.createElement("img");
+        image.alt = "background";
+        setResolvedImageSource(image, src);
+        btn.appendChild(image);
+        btn.onclick = () => {
+            pendingBackgroundImage = src;
+            pendingBackgroundReset = false;
+            applySiteWallpaper(src, applyHeaderWallpaperInput.checked);
+        };
+        backgroundImageLibrary.appendChild(btn);
+    });
+};
+
+openProfileCropModal = async function(imageData, initialCrop) {
+    profileCropDraft = {
+        imageData,
+        crop: { ...getDefaultProfileCrop(), ...(initialCrop || {}) }
+    };
+    profileCropImage.src = await resolveImageAsset(imageData);
+    profileCropZoom.value = String(profileCropDraft.crop.scale);
+    renderProfileCropStage();
+    profileCropModal.classList.remove("hidden");
+};
+
+applySiteWallpaper = function(imageData, applyToHeader) {
+    const token = ++wallpaperApplyToken;
+    const applyResolvedWallpaper = (resolvedImage) => {
+        if (token !== wallpaperApplyToken) return;
+        const hasWallpaper = Boolean(resolvedImage);
+        document.body.classList.toggle("has-custom-wallpaper", hasWallpaper);
+        document.body.style.backgroundImage = hasWallpaper ? `url("${resolvedImage}")` : "";
+        pageHeader.style.setProperty("background-color", "#ffffff", "important");
+        pageHeader.style.setProperty(
+            "background-image",
+            resolvedImage && applyToHeader
+                ? `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url("${resolvedImage}")`
+                : "none",
+            "important"
+        );
+        pageHeader.style.setProperty("background-position", "center", "important");
+        pageHeader.style.setProperty("background-size", "cover", "important");
+        pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+    };
+
+    if (!imageData) {
+        applyResolvedWallpaper("");
+        return;
+    }
+
+    resolveImageAsset(imageData).then(applyResolvedWallpaper);
+};
+
+applyRecordAppearance = function() {
+    const activeTrack = getTrackForMusicVisuals();
+    const styleId = getEffectiveRecordStyle(activeTrack);
+    const effectId = musicState.recordEffect || "none";
+    const applyToken = ++recordAppearanceToken;
+
+    clearRecordStyleClasses(recordDisc);
+    recordDisc.style.removeProperty("--custom-record-art");
+    recordDisc.classList.add(`record-style-${styleId}`);
+    applyRecordEffectClasses(recordDisc, effectId);
+
+    if (activeTrack?.customRecordArt) {
+        resolveImageAsset(activeTrack.customRecordArt).then((resolvedArt) => {
+            if (applyToken !== recordAppearanceToken || !resolvedArt) return;
+            recordDisc.style.setProperty("--custom-record-art", `url("${resolvedArt}")`);
+        });
+    }
+
+    applyGlobalRecordPreview();
+};
+
+handleTrackBackgroundUpload = async function(event) {
+    const file = event.target.files?.[0];
+    const targetTrack = getTrackById(pendingTrackBackgroundTargetId);
+    if (!file || !targetTrack) return;
+    if (file.size > MAX_TRACK_BACKGROUND_SIZE) {
+        alert("배경 이미지는 16MB 이하만 업로드할 수 있습니다.");
+        return;
+    }
+
+    try {
+        const imageData = await readFileAsDataUrl(file);
+        const storedImage = await saveImageAsset(imageData);
+        const previousArt = targetTrack.customBackgroundArt || "";
+        const previousVideoId = targetTrack.customBackgroundVideoId || "";
+        targetTrack.customBackgroundArt = storedImage;
+        targetTrack.customBackgroundVideoId = "";
+
+        if (!saveMusicState()) {
+            targetTrack.customBackgroundArt = previousArt;
+            targetTrack.customBackgroundVideoId = previousVideoId;
+            alert("배경 이미지 저장에 실패했습니다. 파일 크기나 저장 공간을 확인해주세요.");
+            return;
+        }
+
+        renderMusicUI();
+        renderLibraryPickerIfVisible();
+    } catch (error) {
+        console.warn("Failed to load background art", error);
+        alert("배경 이미지를 불러오지 못했습니다. 다시 시도해주세요.");
+    }
+};
+
+handleTrackArtUpload = async function(event) {
+    const file = event.target.files?.[0];
+    const targetTrack = getTrackById(pendingTrackArtTargetId);
+    if (!file || !targetTrack) return;
+    if (file.size > MAX_TRACK_ART_SIZE) {
+        alert("음반 이미지는 6MB 이하만 업로드할 수 있습니다. 이미지 크기를 줄여서 다시 시도해주세요.");
+        return;
+    }
+
+    try {
+        const imageData = await readFileAsDataUrl(file);
+        const storedImage = await saveImageAsset(imageData);
+        const previousArt = targetTrack.customRecordArt || "";
+        targetTrack.customRecordArt = storedImage;
+
+        if (!saveMusicState()) {
+            targetTrack.customRecordArt = previousArt;
+            alert("이미지 저장에 실패했습니다. 파일이 너무 크거나 브라우저 저장 공간이 부족할 수 있습니다.");
+            return;
+        }
+
+        renderMusicUI();
+        renderLibraryPickerIfVisible();
+        if (!recordStyleModal.classList.contains("hidden") && musicState.selectedTrackId === targetTrack.id) {
+            renderRecordStyleOptions();
+        }
+    } catch (error) {
+        console.warn("Failed to load record art", error);
+        alert("음반 이미지를 불러오지 못했습니다. 다시 시도해주세요.");
+    }
+};
+
+Promise.resolve().then(async () => {
+    if (window.__magnusIndexedImageStabilized) return;
+    window.__magnusIndexedImageStabilized = true;
+
+    try {
+        if (isLoggedInUser()) {
+            await migrateStoredImageAssetsForCurrentUser();
+        }
+        const currentUser = getCurrentUser();
+        if (currentUser) {
+            await renderProfileImageLibrary(currentUser);
+            await renderBackgroundImageLibrary(currentUser);
+            updateProfileDisplay(currentUser.profilePic, currentUser.profilePicCrop);
+            applyMainPageLayout(currentUser);
+            const wallpaperImage = pendingBackgroundImage !== null
+                ? pendingBackgroundImage
+                : (currentUser.backgroundImage || "");
+            applySiteWallpaper(wallpaperImage, Boolean(applyHeaderWallpaperInput?.checked || currentUser.applyHeaderWallpaper));
+        }
+        applyRecordAppearance();
+        await applyMusicTrackBackdrop();
+    } catch (error) {
+        console.warn("Failed to stabilize IndexedDB image storage", error);
+    }
+});
+
+
+
+

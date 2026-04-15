@@ -6038,6 +6038,7 @@ function applyMusicThemeToPage() {
     musicPage.style.setProperty("--music-record-border", hexToRgbTriplet(theme.record.neonColor));
     musicPage.style.setProperty("--music-record-neon", hexToRgbTriplet(theme.record.neonColor));
     musicPage.style.setProperty("--music-record-opacity", String(theme.record.fillOpacity));
+    musicPage.style.setProperty("--music-record-disc-opacity", String(theme.record.fillOpacity));
     musicPage.style.setProperty("--music-record-border-opacity", String(theme.record.borderOpacity));
     musicPage.style.setProperty("--music-record-neon-opacity", String(theme.record.neonOpacity));
 

@@ -310,6 +310,7 @@ const repeatToggleBtn = document.getElementById("repeat-toggle");
 const autoplayToggleBtn = document.getElementById("autoplay-toggle");
 const musicStyleEditBtn = document.getElementById("music-style-edit-btn");
 const musicStyleCloseBtn = document.getElementById("music-style-close-btn");
+document.getElementById("record-disc-opacity")?.closest(".environment-card")?.remove();
 const musicStylePanel = document.getElementById("music-style-panel");
 const musicBarBgColorInput = document.getElementById("music-bar-bg-color");
 const musicBarBorderColorInput = document.getElementById("music-bar-border-color");

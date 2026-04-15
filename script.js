@@ -3323,6 +3323,590 @@ function renderLibraryPicker() {
     });
 }
 
+const IMAGE_ASSET_STORE_NAME = "imageAssets";
+const imageAssetCache = new Map();
+const imageAssetDataCache = new Map();
+let wallpaperApplyToken = 0;
+let profileDisplayToken = 0;
+let recordAppearanceToken = 0;
+
+function isImageAssetRef(value) {
+    return typeof value === "string" && value.startsWith("idbimg:");
+}
+
+function createImageAssetRef(assetId) {
+    return assetId ? `idbimg:${assetId}` : "";
+}
+
+function getImageAssetId(value) {
+    return isImageAssetRef(value) ? value.slice("idbimg:".length) : "";
+}
+
+function isInlineImageData(value) {
+    return typeof value === "string" && value.startsWith("data:image/");
+}
+
+function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(String(event.target?.result || ""));
+        reader.onerror = () => reject(reader.error || new Error("Failed to read file"));
+        reader.readAsDataURL(file);
+    });
+}
+
+async function saveImageAsset(imageData) {
+    if (!imageData || !isInlineImageData(imageData) || !isLoggedInUser()) {
+        return imageData || "";
+    }
+
+    const cachedRef = imageAssetDataCache.get(imageData);
+    if (cachedRef) return cachedRef;
+
+    const assetId = `${getCurrentUserId() || "guest"}::img::${Date.now()}::${Math.random().toString(36).slice(2, 10)}`;
+    const db = await openMusicDb();
+
+    await new Promise((resolve, reject) => {
+        const transaction = db.transaction(IMAGE_ASSET_STORE_NAME, "readwrite");
+        const store = transaction.objectStore(IMAGE_ASSET_STORE_NAME);
+        store.put({ data: imageData, updatedAt: Date.now() }, assetId);
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+    });
+
+    const ref = createImageAssetRef(assetId);
+    imageAssetCache.set(assetId, imageData);
+    imageAssetDataCache.set(imageData, ref);
+    return ref;
+}
+
+async function resolveImageAsset(imageValue) {
+    if (!imageValue) return "";
+    if (!isImageAssetRef(imageValue)) return imageValue;
+
+    const assetId = getImageAssetId(imageValue);
+    if (!assetId) return "";
+    if (imageAssetCache.has(assetId)) {
+        return imageAssetCache.get(assetId) || "";
+    }
+
+    try {
+        const db = await openMusicDb();
+        const asset = await new Promise((resolve, reject) => {
+            const transaction = db.transaction(IMAGE_ASSET_STORE_NAME, "readonly");
+            const request = transaction.objectStore(IMAGE_ASSET_STORE_NAME).get(assetId);
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => reject(request.error);
+        });
+        const imageData = typeof asset === "string" ? asset : String(asset?.data || "");
+        if (imageData) {
+            imageAssetCache.set(assetId, imageData);
+            imageAssetDataCache.set(imageData, imageValue);
+        }
+        return imageData;
+    } catch (error) {
+        console.warn("Failed to resolve image asset", error);
+        return "";
+    }
+}
+
+function setResolvedImageSource(img, imageValue) {
+    const token = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    img.dataset.imageResolveToken = token;
+    if (!imageValue) {
+        img.removeAttribute("src");
+        return;
+    }
+
+    resolveImageAsset(imageValue).then((resolved) => {
+        if (img.dataset.imageResolveToken !== token) return;
+        if (resolved) {
+            img.src = resolved;
+        } else {
+            img.removeAttribute("src");
+        }
+    });
+}
+
+function openMusicDb() {
+    if (musicDbPromise) return musicDbPromise;
+
+    musicDbPromise = new Promise((resolve, reject) => {
+        const request = indexedDB.open(MUSIC_DB_NAME, 2);
+
+        request.onupgradeneeded = () => {
+            const db = request.result;
+            if (!db.objectStoreNames.contains(MUSIC_STORE_NAME)) {
+                db.createObjectStore(MUSIC_STORE_NAME);
+            }
+            if (!db.objectStoreNames.contains(IMAGE_ASSET_STORE_NAME)) {
+                db.createObjectStore(IMAGE_ASSET_STORE_NAME);
+            }
+        };
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+
+    return musicDbPromise;
+}
+
+async function migrateStoredImageAssetsForCurrentUser() {
+    if (!isLoggedInUser()) return;
+    await openMusicDb();
+
+    let users = getUsers();
+    const currentUser = getCurrentUser();
+    const userIndex = users.findIndex((user) => user.id === currentUser?.id);
+    let userChanged = false;
+    let musicChanged = false;
+
+    const migrateValue = async (value) => {
+        if (!value || isImageAssetRef(value) || !isInlineImageData(value)) return value || "";
+        return saveImageAsset(value);
+    };
+
+    const migrateList = async (items) => {
+        if (!Array.isArray(items) || !items.length) return items;
+        const nextItems = [];
+        let changed = false;
+        for (const item of items) {
+            const nextItem = await migrateValue(item);
+            if (nextItem !== item) changed = true;
+            nextItems.push(nextItem);
+        }
+        return changed ? nextItems : items;
+    };
+
+    if (userIndex !== -1) {
+        const user = { ...users[userIndex] };
+        const nextProfilePic = await migrateValue(user.profilePic || "");
+        const nextBackgroundImage = await migrateValue(user.backgroundImage || "");
+        const nextProfileHistory = await migrateList(user.profileImageHistory || []);
+        const nextBackgroundHistory = await migrateList(user.backgroundImageHistory || []);
+
+        if (
+            nextProfilePic !== (user.profilePic || "") ||
+            nextBackgroundImage !== (user.backgroundImage || "") ||
+            nextProfileHistory !== user.profileImageHistory ||
+            nextBackgroundHistory !== user.backgroundImageHistory
+        ) {
+            user.profilePic = nextProfilePic;
+            user.backgroundImage = nextBackgroundImage;
+            user.profileImageHistory = nextProfileHistory;
+            user.backgroundImageHistory = nextBackgroundHistory;
+            users[userIndex] = user;
+            saveUsers(users);
+            userChanged = true;
+        }
+    }
+
+    for (const track of musicState.library) {
+        const nextRecordArt = await migrateValue(track.customRecordArt || "");
+        const nextBackgroundArt = await migrateValue(track.customBackgroundArt || "");
+        if (nextRecordArt !== (track.customRecordArt || "") || nextBackgroundArt !== (track.customBackgroundArt || "")) {
+            track.customRecordArt = nextRecordArt;
+            track.customBackgroundArt = nextBackgroundArt;
+            musicChanged = true;
+        }
+    }
+
+    if (userChanged) {
+        const refreshedUser = getCurrentUser();
+        renderProfileImageLibrary(refreshedUser);
+        renderBackgroundImageLibrary(refreshedUser);
+        applyMainPageLayout(refreshedUser);
+        updateProfileDisplay(refreshedUser?.profilePic, refreshedUser?.profilePicCrop);
+        const wallpaperImage = pendingBackgroundImage !== null ? pendingBackgroundImage : (refreshedUser?.backgroundImage || "");
+        applySiteWallpaper(wallpaperImage, Boolean(applyHeaderWallpaperInput?.checked || refreshedUser?.applyHeaderWallpaper));
+    }
+
+    if (musicChanged) {
+        saveMusicState();
+        renderMusicUI();
+        renderLibraryPickerIfVisible();
+        applyRecordAppearance();
+        applyMusicTrackBackdrop();
+    }
+}
+
+renderProfileImageLibrary = async function(user = getCurrentUser()) {
+    if (!profileImageLibrary) return;
+    const items = Array.isArray(user?.profileImageHistory) ? user.profileImageHistory : [];
+    profileImageLibrary.innerHTML = "";
+    items.forEach((src) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "image-history-item";
+        const image = document.createElement("img");
+        image.alt = "profile";
+        setResolvedImageSource(image, src);
+        btn.appendChild(image);
+        btn.onclick = () => {
+            openProfileCropModal(src, pendingProfileCrop || user?.profilePicCrop || getDefaultProfileCrop());
+        };
+        profileImageLibrary.appendChild(btn);
+    });
+};
+
+renderBackgroundImageLibrary = async function(user = getCurrentUser()) {
+    if (!backgroundImageLibrary) return;
+    const items = Array.isArray(user?.backgroundImageHistory) ? user.backgroundImageHistory : [];
+    backgroundImageLibrary.innerHTML = "";
+    items.forEach((src) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "image-history-item";
+        const image = document.createElement("img");
+        image.alt = "background";
+        setResolvedImageSource(image, src);
+        btn.appendChild(image);
+        btn.onclick = () => {
+            pendingBackgroundImage = src;
+            pendingBackgroundReset = false;
+            applySiteWallpaper(src, applyHeaderWallpaperInput.checked);
+        };
+        backgroundImageLibrary.appendChild(btn);
+    });
+};
+
+updateProfileDisplay = function(picData, cropData = null) {
+    const token = ++profileDisplayToken;
+    resolveImageAsset(picData).then((resolved) => {
+        if (token !== profileDisplayToken) return;
+        if (!resolved) {
+            clearProfileDisplay();
+            return;
+        }
+        [headerProfileImg, profilePreview].forEach((img) => {
+            img.src = resolved;
+            img.classList.remove("hidden");
+            applyProfileCropStyles(img, cropData);
+        });
+        [defaultAvatar, previewPlus].forEach((el) => el.classList.add("hidden"));
+    });
+};
+
+applySiteWallpaper = function(imageData, applyToHeader) {
+    const token = ++wallpaperApplyToken;
+    const applyResolvedWallpaper = (resolvedImage) => {
+        if (token !== wallpaperApplyToken) return;
+        const hasWallpaper = Boolean(resolvedImage);
+        document.body.classList.toggle("has-custom-wallpaper", hasWallpaper);
+        document.body.style.backgroundImage = hasWallpaper ? `url("${resolvedImage}")` : "";
+        pageHeader.style.setProperty("background-color", "#ffffff", "important");
+        pageHeader.style.setProperty(
+            "background-image",
+            resolvedImage && applyToHeader
+                ? `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url("${resolvedImage}")`
+                : "none",
+            "important"
+        );
+        pageHeader.style.setProperty("background-position", "center", "important");
+        pageHeader.style.setProperty("background-size", "cover", "important");
+        pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+    };
+
+    if (!imageData) {
+        applyResolvedWallpaper("");
+        return;
+    }
+
+    resolveImageAsset(imageData).then(applyResolvedWallpaper);
+};
+
+openProfileCropModal = async function(imageData, initialCrop) {
+    profileCropDraft = {
+        imageData,
+        crop: { ...getDefaultProfileCrop(), ...(initialCrop || {}) }
+    };
+    profileCropImage.src = await resolveImageAsset(imageData);
+    profileCropZoom.value = String(profileCropDraft.crop.scale);
+    renderProfileCropStage();
+    profileCropModal.classList.remove("hidden");
+};
+
+handleProfileImageChange = async function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+        alert("이미지 파일만 업로드할 수 있습니다.");
+        e.target.value = "";
+        return;
+    }
+
+    if (file.size > 16 * 1024 * 1024) {
+        alert("프로필 이미지는 16MB 이하로 업로드해주세요. 움직이는 이미지나 큰 이미지는 용량이 금방 커질 수 있습니다.");
+        e.target.value = "";
+        return;
+    }
+
+    try {
+        const imageData = await readFileAsDataUrl(file);
+        const storedImage = await saveImageAsset(imageData);
+        const currentUser = getCurrentUser();
+        if (currentUser) {
+            const users = getUsers();
+            const index = users.findIndex((user) => user.id === currentUser.id);
+            if (index !== -1) {
+                users[index].profileImageHistory = addImageToHistory(users[index].profileImageHistory, storedImage);
+                saveUsers(users);
+                renderProfileImageLibrary(users[index]);
+            }
+        }
+        openProfileCropModal(storedImage, pendingProfileCrop || getCurrentUser()?.profilePicCrop || getDefaultProfileCrop());
+    } catch (error) {
+        console.warn("Failed to load profile image", error);
+        alert("프로필 이미지를 불러오지 못했습니다. 다시 시도해주세요.");
+    }
+    e.target.value = "";
+};
+
+handleBackgroundImageChange = async function(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+        alert("이미지 파일만 업로드할 수 있습니다.");
+        event.target.value = "";
+        return;
+    }
+
+    if (file.size > 24 * 1024 * 1024) {
+        alert("배경화면 이미지는 24MB 이하로 업로드해주세요. 움직이는 배경은 용량이 빠르게 커질 수 있습니다.");
+        event.target.value = "";
+        return;
+    }
+
+    try {
+        const imageData = await readFileAsDataUrl(file);
+        pendingBackgroundImage = await saveImageAsset(imageData);
+        pendingBackgroundReset = false;
+        const currentUser = getCurrentUser();
+        if (currentUser) {
+            const users = getUsers();
+            const index = users.findIndex((user) => user.id === currentUser.id);
+            if (index !== -1) {
+                users[index].backgroundImageHistory = addImageToHistory(users[index].backgroundImageHistory, pendingBackgroundImage);
+                saveUsers(users);
+                renderBackgroundImageLibrary(users[index]);
+            }
+        }
+        applySiteWallpaper(pendingBackgroundImage, applyHeaderWallpaperInput.checked);
+    } catch (error) {
+        console.warn("Failed to load background image", error);
+        alert("배경 이미지를 불러오지 못했습니다. 다시 시도해주세요.");
+    }
+    event.target.value = "";
+};
+
+handleTrackArtUpload = async function(event) {
+    const file = event.target.files?.[0];
+    const targetTrack = getTrackById(pendingTrackArtTargetId);
+    if (!file || !targetTrack) return;
+    if (file.size > 6 * 1024 * 1024) {
+        alert("음반 이미지는 6MB 이하만 업로드할 수 있습니다.");
+        return;
+    }
+
+    try {
+        const imageData = await readFileAsDataUrl(file);
+        const storedImage = await saveImageAsset(imageData);
+        const previousArt = targetTrack.customRecordArt || "";
+        targetTrack.customRecordArt = storedImage;
+
+        if (!saveMusicState()) {
+            targetTrack.customRecordArt = previousArt;
+            alert("이미지 저장에 실패했습니다. 파일이 너무 크거나 브라우저 저장 공간이 부족할 수 있습니다.");
+            return;
+        }
+
+        renderMusicUI();
+        renderLibraryPickerIfVisible();
+        if (!recordStyleModal.classList.contains("hidden") && musicState.selectedTrackId === targetTrack.id) {
+            renderRecordStyleOptions();
+        }
+    } catch (error) {
+        console.warn("Failed to load record art", error);
+        alert("음반 이미지를 불러오지 못했습니다. 다시 시도해주세요.");
+    }
+};
+
+handleTrackBackgroundUpload = async function(event) {
+    const file = event.target.files?.[0];
+    const targetTrack = getTrackById(pendingTrackBackgroundTargetId);
+    if (!file || !targetTrack) return;
+    if (file.size > 16 * 1024 * 1024) {
+        alert("배경 이미지는 16MB 이하만 업로드할 수 있습니다.");
+        return;
+    }
+
+    try {
+        const imageData = await readFileAsDataUrl(file);
+        const storedImage = await saveImageAsset(imageData);
+        const previousArt = targetTrack.customBackgroundArt || "";
+        const previousVideoId = targetTrack.customBackgroundVideoId || "";
+        targetTrack.customBackgroundArt = storedImage;
+        targetTrack.customBackgroundVideoId = "";
+
+        if (!saveMusicState()) {
+            targetTrack.customBackgroundArt = previousArt;
+            targetTrack.customBackgroundVideoId = previousVideoId;
+            alert("배경 이미지 저장에 실패했습니다. 파일 크기나 저장 공간을 확인해주세요.");
+            return;
+        }
+
+        renderMusicUI();
+        renderLibraryPickerIfVisible();
+    } catch (error) {
+        console.warn("Failed to load background art", error);
+        alert("배경 이미지를 불러오지 못했습니다. 다시 시도해주세요.");
+    }
+};
+
+applyRecordAppearance = function() {
+    const activeTrack = getTrackForMusicVisuals();
+    const styleId = getEffectiveRecordStyle(activeTrack);
+    const effectId = musicState.recordEffect || "none";
+    const applyToken = ++recordAppearanceToken;
+
+    clearRecordStyleClasses(recordDisc);
+    recordDisc.style.removeProperty("--custom-record-art");
+    recordDisc.classList.add(`record-style-${styleId}`);
+    applyRecordEffectClasses(recordDisc, effectId);
+
+    if (activeTrack?.customRecordArt) {
+        resolveImageAsset(activeTrack.customRecordArt).then((resolvedArt) => {
+            if (applyToken !== recordAppearanceToken || !resolvedArt) return;
+            const recordArtValue = `url("${resolvedArt}")`;
+            recordDisc.style.setProperty("--custom-record-art", recordArtValue);
+        });
+    }
+
+    applyGlobalRecordPreview();
+};
+
+applyMusicTrackBackdrop = async function() {
+    const musicPage = document.getElementById("music-page");
+    if (!musicPage) return;
+    const isMusicPageVisible = !musicPage.classList.contains("hidden");
+
+    const activeTrack = getTrackForMusicVisuals();
+    const backgroundArt = activeTrack?.customBackgroundArt || "";
+    const backgroundVideoId = activeTrack?.customBackgroundVideoId || "";
+    const backgroundVideoStart = Math.max(0, Number(activeTrack?.customBackgroundVideoStart || 0));
+    const currentUser = getCurrentUser();
+    const musicBackgroundOpacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
+        ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
+        : Math.min(1, Math.max(0, Number(musicBackgroundOpacityInput?.value || 100) / 100));
+    const applyMusicHeaderWallpaper = currentUser?.applyMusicHeaderWallpaper !== false
+        && Boolean(applyMusicHeaderWallpaperInput?.checked ?? true);
+    const wallpaperImage = pendingBackgroundImage !== null
+        ? pendingBackgroundImage
+        : (currentUser?.backgroundImage || "");
+    const applyHeaderWallpaper = Boolean(applyHeaderWallpaperInput?.checked || currentUser?.applyHeaderWallpaper);
+    const resolvedBackgroundArt = backgroundArt ? await resolveImageAsset(backgroundArt) : "";
+    const backdropKey = backgroundVideoId
+        ? `video:${backgroundVideoId}@${backgroundVideoStart}`
+        : (resolvedBackgroundArt ? `image:${backgroundArt}` : "");
+
+    const hideVideoBackdrop = () => {
+        if (musicVideoBackdrop) {
+            musicVideoBackdrop.classList.add("hidden");
+            musicVideoBackdrop.style.opacity = "0";
+        }
+        if (musicVideoBackdropFrame) {
+            musicVideoBackdropFrame.innerHTML = "";
+        }
+    };
+
+    if (!resolvedBackgroundArt && !backgroundVideoId) {
+        lastAppliedMusicBackground = "";
+        musicPage.classList.remove("has-track-background", "track-backdrop-refresh");
+        musicPage.style.setProperty("--music-track-bg-url", "none");
+        musicPage.style.setProperty("--music-track-bg-opacity", "0");
+        hideVideoBackdrop();
+        if (isMusicPageVisible) {
+            applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        }
+        return;
+    }
+
+    const hasChanged = backdropKey !== lastAppliedMusicBackground;
+    lastAppliedMusicBackground = backdropKey;
+    musicPage.style.setProperty("--music-track-bg-opacity", String(musicBackgroundOpacity));
+
+    if (backgroundVideoId) {
+        musicPage.classList.remove("has-track-background");
+        musicPage.style.setProperty("--music-track-bg-url", "none");
+
+        if (!isMusicPageVisible) {
+            hideVideoBackdrop();
+            return;
+        }
+
+        if (musicVideoBackdrop) {
+            musicVideoBackdrop.classList.remove("hidden");
+            musicVideoBackdrop.style.opacity = String(musicBackgroundOpacity);
+        }
+        if (musicVideoBackdropFrame) {
+            const embedUrl = `https://www.youtube.com/embed/${backgroundVideoId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${backgroundVideoId}&start=${Math.floor(backgroundVideoStart)}&modestbranding=1&playsinline=1&rel=0&enablejsapi=1`;
+            const currentIframe = musicVideoBackdropFrame.querySelector("iframe");
+            if (!currentIframe || currentIframe.src !== embedUrl) {
+                musicVideoBackdropFrame.innerHTML = `<iframe src="${embedUrl}" title="Music background video" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+            }
+        }
+
+        if (applyMusicHeaderWallpaper) {
+            pageHeader.style.setProperty("background-color", "#ffffff", "important");
+            pageHeader.style.setProperty(
+                "background-image",
+                `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url(https://i.ytimg.com/vi/${backgroundVideoId}/hqdefault.jpg)`,
+                "important"
+            );
+            pageHeader.style.setProperty("background-position", "center top", "important");
+            pageHeader.style.setProperty("background-size", "cover", "important");
+            pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+        } else {
+            applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        }
+    } else {
+        hideVideoBackdrop();
+        musicPage.classList.add("has-track-background");
+        musicPage.style.setProperty("--music-track-bg-url", `url("${resolvedBackgroundArt}")`);
+
+        if (isMusicPageVisible && applyMusicHeaderWallpaper) {
+            pageHeader.style.setProperty("background-color", "#ffffff", "important");
+            pageHeader.style.setProperty(
+                "background-image",
+                `linear-gradient(rgba(255,255,255,0.76), rgba(255,255,255,0.76)), url("${resolvedBackgroundArt}")`,
+                "important"
+            );
+            pageHeader.style.setProperty("background-position", "center top", "important");
+            pageHeader.style.setProperty("background-size", "cover", "important");
+            pageHeader.style.setProperty("background-repeat", "no-repeat", "important");
+        } else if (isMusicPageVisible) {
+            applySiteWallpaper(wallpaperImage, applyHeaderWallpaper);
+        }
+    }
+
+    if (hasChanged) {
+        musicPage.classList.remove("track-backdrop-refresh");
+        void musicPage.offsetWidth;
+        musicPage.classList.add("track-backdrop-refresh");
+    }
+};
+
+const __originalLoadMusicStateForImageAssets = loadMusicState;
+loadMusicState = async function() {
+    await __originalLoadMusicStateForImageAssets();
+    if (isLoggedInUser()) {
+        await migrateStoredImageAssetsForCurrentUser();
+    }
+    saveMusicState();
+};
+
 function requestTrackBackgroundVideo(trackId) {
     if (typeof openTrackBackgroundVideoModal === "function") {
         openTrackBackgroundVideoModal(trackId);

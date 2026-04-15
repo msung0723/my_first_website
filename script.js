@@ -9138,7 +9138,7 @@ requestTrackBackgroundVideo = function(trackId) {
     }
 };
 
-let musicBackgroundVideoSyncTimerReallyFinal = null;
+musicBackgroundVideoSyncTimerReallyFinal = null;
 
 function queueMusicBackgroundVideoSyncReallyFinal(delay = 0) {
     if (musicBackgroundVideoSyncTimerReallyFinal) {

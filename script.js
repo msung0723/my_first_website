@@ -273,6 +273,36 @@ if (!window.__codexMusicBgSyncFixV2Applied) {
     };
 }
 
+if (!window.__codexInitialRecordClickFixApplied) {
+    window.__codexInitialRecordClickFixApplied = true;
+
+    handleRecordInteraction = async function() {
+        if (!musicState.selectedTrackId) {
+            normalizeSelectedTrack();
+            saveMusicState();
+            renderMusicUI();
+        }
+
+        let selectedTrack = getTrackById(musicState.selectedTrackId);
+        if (!selectedTrack) {
+            normalizeSelectedTrack();
+            selectedTrack = getTrackById(musicState.selectedTrackId);
+        }
+
+        if (!selectedTrack) {
+            alert("먼저 재생할 음악을 선택해주세요.");
+            return;
+        }
+
+        if (musicState.playingTrackId === selectedTrack.id) {
+            await toggleCurrentPlayback(selectedTrack);
+            return;
+        }
+
+        await playSelectedTrack();
+    };
+}
+
 const addMusicBtn = document.getElementById("add-music-btn");
 const editPlaylistBtn = document.getElementById("edit-playlist-btn");
 const playlistPrevBtn = document.getElementById("playlist-prev");
@@ -4784,6 +4814,20 @@ function closeTrackBackgroundVideoModal() {
             trackBackgroundVideoEditorPlayer.pauseVideo();
         } catch (error) {
             console.warn("Failed to pause track background video editor", error);
+        }
+    }
+    if (trackBackgroundVideoEditorPlayer && typeof trackBackgroundVideoEditorPlayer.stopVideo === "function") {
+        try {
+            trackBackgroundVideoEditorPlayer.stopVideo();
+        } catch (error) {
+            console.warn("Failed to stop track background video editor", error);
+        }
+    }
+    if (trackBackgroundVideoEditorPlayer && typeof trackBackgroundVideoEditorPlayer.seekTo === "function") {
+        try {
+            trackBackgroundVideoEditorPlayer.seekTo(0, true);
+        } catch (error) {
+            console.warn("Failed to reset track background video editor", error);
         }
     }
     pendingTrackBackgroundVideoTargetId = null;

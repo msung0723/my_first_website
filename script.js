@@ -8722,3 +8722,53 @@ if (!window.__codexPlaybackInteractionFixV4Applied) {
         await playSelectedTrack();
     };
 }
+
+if (!window.__codexPlaylistWheelFixV2Applied) {
+    window.__codexPlaylistWheelFixV2Applied = true;
+
+    let playlistWheelAccumulatorV2 = 0;
+    let playlistWheelCooldownV2 = 0;
+
+    const normalizePlaylistWheelDelta = (event) => {
+        const baseDelta = Number(event.deltaY || 0);
+        if (event.deltaMode === 1) return baseDelta * 16;
+        if (event.deltaMode === 2) return baseDelta * 48;
+        return baseDelta;
+    };
+
+    const handlePlaylistWheelSelectionV2 = (event) => {
+        const musicPage = document.getElementById("music-page");
+        if (!musicPage || musicPage.classList.contains("hidden")) return;
+        if (!event.target.closest(".music-playlist")) return;
+
+        const playlist = getCurrentPlaylist();
+        if (!playlist || !playlist.trackIds.length) return;
+
+        event.preventDefault();
+
+        const now = Date.now();
+        if (now < playlistWheelCooldownV2) return;
+
+        const normalizedDelta = normalizePlaylistWheelDelta(event);
+        playlistWheelAccumulatorV2 += normalizedDelta;
+
+        const directStep = Math.abs(normalizedDelta) >= 40;
+        const accumulatedStep = Math.abs(playlistWheelAccumulatorV2) >= 16;
+        if (!directStep && !accumulatedStep) return;
+
+        const direction = normalizedDelta > 0 ? 1 : -1;
+        playlistWheelAccumulatorV2 = 0;
+        playlistWheelCooldownV2 = now + 130;
+        moveSelection(direction);
+    };
+
+    const bindPlaylistWheelSelectionV2 = () => {
+        const musicPlaylist = document.querySelector(".music-playlist");
+        if (!musicPlaylist || musicPlaylist.dataset.wheelBound === "true") return;
+        musicPlaylist.dataset.wheelBound = "true";
+        musicPlaylist.addEventListener("wheel", handlePlaylistWheelSelectionV2, { passive: false });
+    };
+
+    bindPlaylistWheelSelectionV2();
+    window.addEventListener("load", bindPlaylistWheelSelectionV2);
+}

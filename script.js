@@ -295,11 +295,20 @@ if (!window.__codexInitialRecordClickFixApplied) {
             return;
         }
 
-        if (musicState.playingTrackId === selectedTrack.id) {
+        const canToggleCurrentTrack = musicState.playingTrackId === selectedTrack.id
+            && (isCurrentTrackPlaying() || isPlaybackPaused());
+
+        if (musicState.playingTrackId === selectedTrack.id && !canToggleCurrentTrack) {
+            musicState.playingTrackId = null;
+            saveMusicState();
+        }
+
+        if (canToggleCurrentTrack) {
             await toggleCurrentPlayback(selectedTrack);
             return;
         }
 
+        musicState.selectedTrackId = selectedTrack.id;
         await playSelectedTrack();
     };
 }
@@ -376,6 +385,7 @@ const musicRecordOpacityInput = document.getElementById("music-record-opacity");
 const musicRecordOpacityFillInput = document.getElementById("music-record-opacity-fill");
 const musicRecordOpacityBorderInput = document.getElementById("music-record-opacity-border");
 const musicRecordOpacityNeonInput = document.getElementById("music-record-opacity-neon");
+const musicBackdropOpacityInput = document.getElementById("music-backdrop-opacity");
 const musicActionBgColorInput = document.getElementById("music-action-bg-color");
 const musicActionBorderColorInput = document.getElementById("music-action-border-color");
 const musicActionNeonColorInput = document.getElementById("music-action-neon-color");
@@ -618,7 +628,11 @@ function bindCoreEvents() {
         applySiteWallpaper(wallpaper, applyHeaderWallpaperInput.checked);
     };
     musicBackgroundOpacityInput.oninput = () => {
-        applyMusicBackgroundOpacity(Number(musicBackgroundOpacityInput.value || 100) / 100);
+        const nextOpacity = Number(musicBackgroundOpacityInput.value || 100) / 100;
+        applyMusicBackgroundOpacity(nextOpacity);
+        if (musicBackdropOpacityInput) {
+            musicBackdropOpacityInput.value = String(nextOpacity);
+        }
     };
     headerFixedToggle.onchange = () => {
         applyHeaderFixedState(headerFixedToggle.checked);
@@ -964,6 +978,26 @@ function applyMusicBackgroundOpacity(opacityValue) {
     const nextOpacity = Number.isFinite(opacityValue) ? Math.min(1, Math.max(0, opacityValue)) : 1;
     document.documentElement.style.setProperty("--music-track-bg-opacity", String(nextOpacity));
     document.getElementById("music-page")?.style.setProperty("--music-track-bg-opacity", String(nextOpacity));
+}
+
+function persistMusicBackgroundOpacity(opacityValue) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+    const users = getUsers();
+    const currentIndex = users.findIndex((user) => user.id === currentUser.id);
+    if (currentIndex === -1) return;
+    users[currentIndex].musicBackgroundOpacity = Math.min(1, Math.max(0, Number(opacityValue)));
+    saveUsers(users);
+}
+
+function handleMusicBackdropOpacityInput() {
+    const nextOpacity = Math.min(1, Math.max(0, Number(musicBackdropOpacityInput?.value || 1)));
+    if (musicBackgroundOpacityInput) {
+        musicBackgroundOpacityInput.value = String(Math.round(nextOpacity * 100));
+    }
+    applyMusicBackgroundOpacity(nextOpacity);
+    persistMusicBackgroundOpacity(nextOpacity);
+    applyMusicTrackBackdrop();
 }
 
 function applyLogoNeonColor(color) {
@@ -2789,6 +2823,8 @@ function bindMusicEvents() {
         input?.addEventListener("input", handleMusicThemeInput);
         input?.addEventListener("change", handleMusicThemeInput);
     });
+    musicBackdropOpacityInput?.addEventListener("input", handleMusicBackdropOpacityInput);
+    musicBackdropOpacityInput?.addEventListener("change", handleMusicBackdropOpacityInput);
 
     editPlaylistBtn.onclick = () => openPlaylistEditor();
     closePlaylistEditorBtn.onclick = () => playlistEditorModal.classList.add("hidden");
@@ -6148,6 +6184,13 @@ function syncMusicThemeInputs() {
     musicRecordOpacityBorderInput.checked = Boolean(theme.record.opacityTargets?.border);
     musicRecordOpacityNeonInput.checked = Boolean(theme.record.opacityTargets?.neon);
     musicRecordOpacityInput.value = String(getMusicThemeDisplayOpacity(theme.record));
+    const currentUser = getCurrentUser();
+    const backdropOpacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
+        ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
+        : Math.min(1, Math.max(0, Number(musicBackgroundOpacityInput?.value || 100) / 100));
+    if (musicBackdropOpacityInput) {
+        musicBackdropOpacityInput.value = String(backdropOpacity);
+    }
     musicActionBgColorInput.value = theme.action.fillColor;
     musicActionBorderColorInput.value = theme.action.borderColor;
     musicActionNeonColorInput.value = theme.action.neonColor;
@@ -8358,6 +8401,102 @@ if (!window.__codexMusicBgSyncFixV3Applied) {
         originalUpdatePlaybackProgressUiForCodexMusicBgSync();
         if (musicState.playingTrackId) {
             scheduleBackdropSync(20);
+        }
+    };
+}
+
+if (!window.__codexRepeatLoopFixApplied) {
+    window.__codexRepeatLoopFixApplied = true;
+    let repeatRestartInFlight = false;
+
+    const originalHandleTrackEndedForRepeatFix = handleTrackEnded;
+    handleTrackEnded = async function() {
+        if (repeatRestartInFlight) return;
+        await originalHandleTrackEndedForRepeatFix();
+    };
+
+    restartCurrentTrack = async function() {
+        if (repeatRestartInFlight) return;
+        repeatRestartInFlight = true;
+
+        try {
+            const playingTrack = getTrackById(musicState.playingTrackId);
+            if (!playingTrack) return;
+
+            musicState.selectedTrackId = playingTrack.id;
+            const backgroundVideoId = playingTrack.customBackgroundVideoId || "";
+            const backgroundVideoStart = Math.max(0, Number(playingTrack.customBackgroundVideoStart || 0));
+
+            if (playingTrack.sourceType === "youtube") {
+                const player = await ensureYoutubePlayer();
+                if (!player) return;
+                if (typeof player.seekTo === "function") {
+                    player.seekTo(0, true);
+                }
+                if (typeof player.playVideo === "function") {
+                    player.playVideo();
+                }
+            } else {
+                musicAudio.pause();
+                musicAudio.currentTime = 0;
+                try {
+                    await musicAudio.play();
+                } catch {
+                    alert("반복 재생을 시작하지 못했습니다. 다시 눌러주세요.");
+                }
+            }
+
+            if (backgroundVideoId) {
+                try {
+                    const bgPlayer = await ensureMusicBackgroundVideoPlayer();
+                    const bgConfig = `${backgroundVideoId}@${backgroundVideoStart}`;
+                    lastAppliedMusicBackgroundVideoConfig = bgConfig;
+
+                    if (musicVideoBackdrop) {
+                        const currentUser = getCurrentUser();
+                        const opacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
+                            ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
+                            : Math.min(1, Math.max(0, Number(musicBackgroundOpacityInput?.value || 100) / 100));
+                        musicVideoBackdrop.classList.remove("hidden");
+                        musicVideoBackdrop.style.opacity = String(opacity);
+                        musicVideoBackdrop.style.backgroundImage = `url(https://i.ytimg.com/vi/${backgroundVideoId}/hqdefault.jpg)`;
+                        musicVideoBackdrop.style.backgroundPosition = "center center";
+                        musicVideoBackdrop.style.backgroundSize = "cover";
+                        musicVideoBackdrop.style.backgroundRepeat = "no-repeat";
+                    }
+
+                    if (bgPlayer) {
+                        const currentVideoData = typeof bgPlayer.getVideoData === "function" ? bgPlayer.getVideoData() : null;
+                        const currentVideoId = currentVideoData?.video_id || "";
+
+                        if (typeof bgPlayer.mute === "function") {
+                            bgPlayer.mute();
+                        }
+
+                        if (currentVideoId !== backgroundVideoId && typeof bgPlayer.loadVideoById === "function") {
+                            bgPlayer.loadVideoById({
+                                videoId: backgroundVideoId,
+                                startSeconds: backgroundVideoStart
+                            });
+                        } else if (typeof bgPlayer.seekTo === "function") {
+                            bgPlayer.seekTo(backgroundVideoStart, true);
+                        }
+
+                        if (typeof bgPlayer.playVideo === "function") {
+                            bgPlayer.playVideo();
+                        }
+                    }
+                } catch (error) {
+                    console.warn("Failed to restart synced music background video", error);
+                }
+            }
+
+            syncPlaybackUi();
+            updatePlaybackProgressUi();
+        } finally {
+            window.setTimeout(() => {
+                repeatRestartInFlight = false;
+            }, 180);
         }
     };
 }

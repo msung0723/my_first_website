@@ -386,6 +386,7 @@ const musicRecordOpacityFillInput = document.getElementById("music-record-opacit
 const musicRecordOpacityBorderInput = document.getElementById("music-record-opacity-border");
 const musicRecordOpacityNeonInput = document.getElementById("music-record-opacity-neon");
 const musicBackdropOpacityInput = document.getElementById("music-backdrop-opacity");
+const musicWheelSensitivityInput = document.getElementById("music-wheel-sensitivity");
 const musicActionBgColorInput = document.getElementById("music-action-bg-color");
 const musicActionBorderColorInput = document.getElementById("music-action-border-color");
 const musicActionNeonColorInput = document.getElementById("music-action-neon-color");
@@ -1831,6 +1832,9 @@ function getDefaultMusicTheme() {
             textNeonOpacity: 0.18,
             opacityTargets: { fill: true, border: false, neon: false },
             textOpacityTargets: { fill: true, border: false, neon: false }
+        },
+        interaction: {
+            wheelSensitivity: 55
         }
     };
 }
@@ -1844,7 +1848,8 @@ function getStoredMusicTheme() {
         now: { ...getDefaultMusicTheme().now, ...(musicState.musicTheme?.now || {}) },
         progress: { ...getDefaultMusicTheme().progress, ...(musicState.musicTheme?.progress || {}) },
         record: { ...getDefaultMusicTheme().record, ...(musicState.musicTheme?.record || {}) },
-        action: { ...getDefaultMusicTheme().action, ...(musicState.musicTheme?.action || {}) }
+        action: { ...getDefaultMusicTheme().action, ...(musicState.musicTheme?.action || {}) },
+        interaction: { ...getDefaultMusicTheme().interaction, ...(musicState.musicTheme?.interaction || {}) }
     };
 }
 
@@ -2819,7 +2824,8 @@ function bindMusicEvents() {
         musicActionOpacityNeonInput,
         musicActionTextOpacityFillInput,
         musicActionTextOpacityBorderInput,
-        musicActionTextOpacityNeonInput
+        musicActionTextOpacityNeonInput,
+        musicWheelSensitivityInput
     ].forEach((input) => {
         input?.addEventListener("input", handleMusicThemeInput);
         input?.addEventListener("change", handleMusicThemeInput);
@@ -6218,6 +6224,9 @@ function syncMusicThemeInputs() {
     if (musicBackdropOpacityInput) {
         musicBackdropOpacityInput.value = String(backdropOpacity);
     }
+    if (musicWheelSensitivityInput) {
+        musicWheelSensitivityInput.value = String(theme.interaction?.wheelSensitivity ?? 55);
+    }
     musicActionBgColorInput.value = theme.action.fillColor;
     musicActionBorderColorInput.value = theme.action.borderColor;
     musicActionNeonColorInput.value = theme.action.neonColor;
@@ -6358,6 +6367,10 @@ function handleMusicThemeInput() {
             textStrokeOpacity: actionTextOpacityTargets.border ? Number(musicActionTextOpacityInput.value) : defaults.action.textStrokeOpacity,
             textNeonOpacity: actionTextOpacityTargets.neon ? Number(musicActionTextOpacityInput.value) : defaults.action.textNeonOpacity,
             textOpacityTargets: actionTextOpacityTargets
+        },
+        interaction: {
+            ...getStoredMusicTheme().interaction,
+            wheelSensitivity: Math.min(100, Math.max(1, Number(musicWheelSensitivityInput?.value || defaults.interaction.wheelSensitivity)))
         }
     };
     saveMusicState();
@@ -8736,6 +8749,11 @@ if (!window.__codexPlaylistWheelFixV2Applied) {
         return baseDelta;
     };
 
+    const getPlaylistWheelSensitivity = () => {
+        const theme = getStoredMusicTheme();
+        return Math.min(100, Math.max(1, Number(theme.interaction?.wheelSensitivity || 55)));
+    };
+
     const handlePlaylistWheelSelectionV2 = (event) => {
         const musicPage = document.getElementById("music-page");
         if (!musicPage || musicPage.classList.contains("hidden")) return;
@@ -8752,8 +8770,12 @@ if (!window.__codexPlaylistWheelFixV2Applied) {
         const normalizedDelta = normalizePlaylistWheelDelta(event);
         playlistWheelAccumulatorV2 += normalizedDelta;
 
-        const directStep = Math.abs(normalizedDelta) >= 40;
-        const accumulatedStep = Math.abs(playlistWheelAccumulatorV2) >= 16;
+        const sensitivity = getPlaylistWheelSensitivity();
+        const directThreshold = Math.max(10, 88 - sensitivity * 0.8);
+        const accumulatedThreshold = Math.max(8, 36 - sensitivity * 0.24);
+
+        const directStep = Math.abs(normalizedDelta) >= directThreshold;
+        const accumulatedStep = Math.abs(playlistWheelAccumulatorV2) >= accumulatedThreshold;
         if (!directStep && !accumulatedStep) return;
 
         const direction = normalizedDelta > 0 ? 1 : -1;

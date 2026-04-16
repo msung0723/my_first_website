@@ -8500,3 +8500,111 @@ if (!window.__codexRepeatLoopFixApplied) {
         }
     };
 }
+
+if (!window.__codexPlaybackInteractionFixV2Applied) {
+    window.__codexPlaybackInteractionFixV2Applied = true;
+
+    const getVisibleMusicTrack = () => {
+        return getTrackForMusicVisuals()
+            || getTrackById(musicState.selectedTrackId)
+            || getTrackById(getCurrentPlaylist()?.trackIds?.[0])
+            || null;
+    };
+
+    toggleCurrentPlayback = async function(track) {
+        if (!track) return;
+
+        if (track.sourceType === "youtube") {
+            const player = await ensureYoutubePlayer();
+            if (!player || !window.YT) return;
+
+            const state = typeof player.getPlayerState === "function"
+                ? player.getPlayerState()
+                : window.YT.PlayerState.UNSTARTED;
+            const currentVideoId = typeof player.getVideoData === "function"
+                ? player.getVideoData()?.video_id || ""
+                : "";
+
+            if (state === window.YT.PlayerState.PLAYING) {
+                if (typeof player.pauseVideo === "function") {
+                    player.pauseVideo();
+                }
+            } else if (currentVideoId === track.youtubeId) {
+                youtubePlayerHost.classList.remove("hidden");
+                if (typeof player.playVideo === "function") {
+                    player.playVideo();
+                }
+            } else {
+                musicState.selectedTrackId = track.id;
+                await playSelectedTrack();
+                return;
+            }
+        } else {
+            if (!musicAudio.src || musicState.playingTrackId !== track.id) {
+                musicState.selectedTrackId = track.id;
+                await playSelectedTrack();
+                return;
+            }
+
+            if (!musicAudio.paused) {
+                musicAudio.pause();
+            } else {
+                if (musicAudio.ended) {
+                    musicAudio.currentTime = 0;
+                }
+                try {
+                    await musicAudio.play();
+                } catch {
+                    alert("브라우저가 재생을 다시 시작하지 못했습니다. 다시 눌러주세요.");
+                }
+            }
+        }
+
+        syncPlaybackUi();
+        updatePlaybackProgressUi();
+        await Promise.resolve(applyMusicTrackBackdrop()).catch(() => {});
+    };
+
+    handleRecordInteraction = async function() {
+        const targetTrack = getVisibleMusicTrack();
+        if (!targetTrack) {
+            alert("먼저 재생할 음악을 선택해주세요.");
+            return;
+        }
+
+        musicState.selectedTrackId = targetTrack.id;
+
+        const canToggleCurrentTrack = musicState.playingTrackId === targetTrack.id
+            && (isCurrentTrackPlaying() || isPlaybackPaused());
+
+        if (musicState.playingTrackId === targetTrack.id && !canToggleCurrentTrack) {
+            musicState.playingTrackId = null;
+            saveMusicState();
+        }
+
+        if (canToggleCurrentTrack) {
+            await toggleCurrentPlayback(targetTrack);
+            return;
+        }
+
+        await playSelectedTrack();
+    };
+}
+
+if (!window.__codexBackdropPauseUiFixApplied) {
+    window.__codexBackdropPauseUiFixApplied = true;
+
+    const originalApplyMusicTrackBackdropForPauseUi = applyMusicTrackBackdrop;
+    applyMusicTrackBackdrop = async function() {
+        await originalApplyMusicTrackBackdropForPauseUi();
+
+        const activeTrack = getTrackForMusicVisuals();
+        const hasBackgroundVideo = Boolean(activeTrack?.customBackgroundVideoId);
+        const shouldShowVideoFrame = hasBackgroundVideo && isPlaybackActive();
+
+        if (musicVideoBackdropFrame) {
+            musicVideoBackdropFrame.style.visibility = shouldShowVideoFrame ? "visible" : "hidden";
+            musicVideoBackdropFrame.style.opacity = shouldShowVideoFrame ? "1" : "0";
+        }
+    };
+}

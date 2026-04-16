@@ -67,6 +67,7 @@ const logoNeonHoverPanel = document.getElementById("logo-neon-hover-panel");
 const logoNeonHoverColorInput = document.getElementById("logo-neon-hover-color");
 const cursorStyleSelect = document.getElementById("cursor-style-select");
 const showShortcutsToggle = document.getElementById("show-shortcuts-toggle");
+const headerFixedToggle = document.getElementById("header-fixed-toggle");
 const settingsTabAccount = document.getElementById("settings-tab-account");
 const settingsTabEnvironment = document.getElementById("settings-tab-environment");
 const settingsPanelAccount = document.getElementById("settings-panel-account");
@@ -619,6 +620,9 @@ function bindCoreEvents() {
     musicBackgroundOpacityInput.oninput = () => {
         applyMusicBackgroundOpacity(Number(musicBackgroundOpacityInput.value || 100) / 100);
     };
+    headerFixedToggle.onchange = () => {
+        applyHeaderFixedState(headerFixedToggle.checked);
+    };
     navVolumeBtn.onclick = (event) => {
         event.stopPropagation();
         headerVolumePanel.classList.toggle("hidden");
@@ -811,6 +815,7 @@ function loadSettings() {
     const logoNeonColor = currentUser?.logoNeonColor || "";
     const cursorStyle = currentUser?.cursorStyle || "default";
     const showShortcuts = currentUser?.showShortcuts !== false;
+    const headerFixed = currentUser?.headerFixed !== false;
     const applyMusicHeaderWallpaper = currentUser?.applyMusicHeaderWallpaper !== false;
     const musicBackgroundOpacity = Number.isFinite(currentUser?.musicBackgroundOpacity)
         ? Math.min(1, Math.max(0, currentUser.musicBackgroundOpacity))
@@ -841,8 +846,10 @@ function loadSettings() {
     logoNeonHoverColorInput.value = logoNeonColor || "#62e7ff";
     cursorStyleSelect.value = cursorStyle;
     showShortcutsToggle.checked = showShortcuts;
+    headerFixedToggle.checked = headerFixed;
     applyMusicHeaderWallpaperInput.checked = applyMusicHeaderWallpaper;
     musicBackgroundOpacityInput.value = String(Math.round(musicBackgroundOpacity * 100));
+    applyHeaderFixedState(headerFixed);
     pendingBackgroundImage = null;
     pendingBackgroundReset = false;
     applyBorderEffect(isRainbow, savedColor);
@@ -1140,6 +1147,10 @@ function persistLogoNeonColor(color) {
 
 function applyCursorStyle(cursorStyle) {
     document.body.style.cursor = cursorStyle || "default";
+}
+
+function applyHeaderFixedState(isFixed) {
+    document.body.classList.toggle("header-unfixed", !isFixed);
 }
 
 function updateMainEditModeUI() {
@@ -2669,6 +2680,7 @@ async function saveProfileSettings() {
         users[currentIndex].logoNeonColor = logoNeonHoverColorInput.value;
         users[currentIndex].cursorStyle = cursorStyleSelect.value;
         users[currentIndex].showShortcuts = showShortcutsToggle.checked;
+        users[currentIndex].headerFixed = headerFixedToggle.checked;
         users[currentIndex].applyMusicHeaderWallpaper = applyMusicHeaderWallpaperInput.checked;
         users[currentIndex].musicBackgroundOpacity = Math.min(1, Math.max(0, Number(musicBackgroundOpacityInput.value || 100) / 100));
         if (pendingBackgroundReset) {

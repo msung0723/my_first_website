@@ -12,6 +12,7 @@ header {
     background-position: center;
     background-repeat: no-repeat;
 }
+body.header-unfixed header { position: relative; top: auto; }
 
 .header-left { display: flex; align-items: center; gap: 15px; }
 .logo-image { height: 150px; cursor: pointer; transition: transform 0.2s; }
@@ -97,6 +98,7 @@ header {
     align-items: center;
     padding-top: 100px;
 }
+body.header-unfixed .welcome-container { padding-top: 0; }
 
 .main-content {
     text-align: center;
@@ -568,6 +570,7 @@ body.is-main-edit-mode .main-custom-image {
 }
 
 #profile-page { padding-top: 120px; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; padding-bottom: 50px; }
+body.header-unfixed #profile-page { padding-top: 24px; }
 .profile-container { background: white; padding: 40px; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); width: 100%; max-width: 800px; }
 .section-title { font-size: 1.8rem; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
 .settings-tab-bar { display: flex; gap: 10px; margin-bottom: 24px; }
@@ -773,6 +776,7 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
     --music-track-bg-url: none;
     --music-track-bg-opacity: 1;
 }
+body.header-unfixed #music-page { padding-top: 0; }
 
 #video-page {
     min-height: 100vh;
@@ -781,6 +785,7 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
         radial-gradient(circle at top, rgba(116,214,255,0.10), transparent 34%),
         #f7f9fc;
 }
+body.header-unfixed #video-page { padding-top: 28px; }
 
 .video-storage-page {
     max-width: 1380px;

@@ -8505,8 +8505,7 @@ if (!window.__codexPlaybackInteractionFixV2Applied) {
     window.__codexPlaybackInteractionFixV2Applied = true;
 
     const getVisibleMusicTrack = () => {
-        return getTrackForMusicVisuals()
-            || getTrackById(musicState.selectedTrackId)
+        return getTrackById(musicState.selectedTrackId)
             || getTrackById(getCurrentPlaylist()?.trackIds?.[0])
             || null;
     };
@@ -8566,6 +8565,12 @@ if (!window.__codexPlaybackInteractionFixV2Applied) {
     };
 
     handleRecordInteraction = async function() {
+        if (!musicState.selectedTrackId) {
+            normalizeSelectedTrack();
+            saveMusicState();
+            renderMusicUI();
+        }
+
         const targetTrack = getVisibleMusicTrack();
         if (!targetTrack) {
             alert("먼저 재생할 음악을 선택해주세요.");
@@ -8574,15 +8579,7 @@ if (!window.__codexPlaybackInteractionFixV2Applied) {
 
         musicState.selectedTrackId = targetTrack.id;
 
-        const canToggleCurrentTrack = musicState.playingTrackId === targetTrack.id
-            && (isCurrentTrackPlaying() || isPlaybackPaused());
-
-        if (musicState.playingTrackId === targetTrack.id && !canToggleCurrentTrack) {
-            musicState.playingTrackId = null;
-            saveMusicState();
-        }
-
-        if (canToggleCurrentTrack) {
+        if (musicState.playingTrackId === targetTrack.id) {
             await toggleCurrentPlayback(targetTrack);
             return;
         }

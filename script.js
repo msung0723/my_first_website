@@ -8600,10 +8600,10 @@ if (!window.__codexBackdropPauseUiFixApplied) {
         const hasBackgroundVideo = Boolean(activeTrack?.customBackgroundVideoId);
         const shouldShowVideoFrame = hasBackgroundVideo
             && Boolean(playingTrack)
-            && playingTrack.id === activeTrack?.id
-            && !isPlaybackPaused();
+            && playingTrack.id === activeTrack?.id;
 
         if (musicVideoBackdropFrame) {
+            musicVideoBackdropFrame.classList.toggle("hidden", !shouldShowVideoFrame);
             musicVideoBackdropFrame.style.visibility = shouldShowVideoFrame ? "visible" : "hidden";
             musicVideoBackdropFrame.style.opacity = shouldShowVideoFrame ? "1" : "0";
             musicVideoBackdropFrame.style.pointerEvents = "none";

@@ -8596,12 +8596,17 @@ if (!window.__codexBackdropPauseUiFixApplied) {
         await originalApplyMusicTrackBackdropForPauseUi();
 
         const activeTrack = getTrackForMusicVisuals();
+        const playingTrack = getTrackById(musicState.playingTrackId);
         const hasBackgroundVideo = Boolean(activeTrack?.customBackgroundVideoId);
-        const shouldShowVideoFrame = hasBackgroundVideo && isPlaybackActive();
+        const shouldShowVideoFrame = hasBackgroundVideo
+            && Boolean(playingTrack)
+            && playingTrack.id === activeTrack?.id
+            && !isPlaybackPaused();
 
         if (musicVideoBackdropFrame) {
             musicVideoBackdropFrame.style.visibility = shouldShowVideoFrame ? "visible" : "hidden";
             musicVideoBackdropFrame.style.opacity = shouldShowVideoFrame ? "1" : "0";
+            musicVideoBackdropFrame.style.pointerEvents = "none";
         }
     };
 }

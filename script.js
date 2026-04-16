@@ -2762,6 +2762,7 @@ function bindMusicEvents() {
     playlistNextBtn.onclick = () => switchPlaylist(1);
     playlistUpBtn.onclick = () => moveSelection(-1);
     playlistDownBtn.onclick = () => moveSelection(1);
+    playlistItemsEl?.addEventListener("wheel", handlePlaylistWheelSelection, { passive: false });
     recordDisc.onclick = () => handleRecordInteraction();
     transportToggleBtn.onclick = () => handleTransportToggle();
     repeatToggleBtn.onclick = () => toggleRepeatMode();
@@ -3175,6 +3176,32 @@ function moveSelection(direction) {
     musicState.selectedTrackId = playlist.trackIds[nextIndex];
     saveMusicState();
     syncPlaybackUi();
+}
+
+let playlistWheelDeltaAccumulator = 0;
+let playlistWheelCooldownUntil = 0;
+
+function handlePlaylistWheelSelection(event) {
+    const musicPage = document.getElementById("music-page");
+    if (!musicPage || musicPage.classList.contains("hidden")) return;
+
+    const playlist = getCurrentPlaylist();
+    if (!playlist || !playlist.trackIds.length) return;
+
+    event.preventDefault();
+
+    const now = Date.now();
+    if (now < playlistWheelCooldownUntil) return;
+
+    playlistWheelDeltaAccumulator += event.deltaY;
+
+    const threshold = 55;
+    if (Math.abs(playlistWheelDeltaAccumulator) < threshold) return;
+
+    const direction = playlistWheelDeltaAccumulator > 0 ? 1 : -1;
+    playlistWheelDeltaAccumulator = 0;
+    playlistWheelCooldownUntil = now + 120;
+    moveSelection(direction);
 }
 
 async function handleRecordInteraction() {

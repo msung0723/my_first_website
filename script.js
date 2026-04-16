@@ -8605,3 +8605,88 @@ if (!window.__codexBackdropPauseUiFixApplied) {
         }
     };
 }
+
+if (!window.__codexPlaybackInteractionFixV4Applied) {
+    window.__codexPlaybackInteractionFixV4Applied = true;
+
+    toggleCurrentPlayback = async function(track) {
+        if (!track) return;
+
+        if (track.sourceType === "youtube") {
+            const player = await ensureYoutubePlayer();
+            if (!player || !window.YT) return;
+
+            const state = typeof player.getPlayerState === "function"
+                ? player.getPlayerState()
+                : window.YT.PlayerState.UNSTARTED;
+            const currentVideoId = typeof player.getVideoData === "function"
+                ? player.getVideoData()?.video_id || ""
+                : "";
+
+            if (state === window.YT.PlayerState.PLAYING && currentVideoId === track.youtubeId) {
+                player.pauseVideo();
+            } else if (currentVideoId === track.youtubeId) {
+                youtubePlayerHost.classList.remove("hidden");
+                player.playVideo();
+            } else {
+                musicState.selectedTrackId = track.id;
+                await playSelectedTrack();
+                return;
+            }
+
+            syncPlaybackUi();
+            updatePlaybackProgressUi();
+            await Promise.resolve(applyMusicTrackBackdrop()).catch(() => {});
+            return;
+        }
+
+        if (!musicAudio.src || musicState.playingTrackId !== track.id) {
+            musicState.selectedTrackId = track.id;
+            await playSelectedTrack();
+            return;
+        }
+
+        if (!musicAudio.paused) {
+            musicAudio.pause();
+        } else {
+            if (musicAudio.ended) {
+                musicAudio.currentTime = 0;
+            }
+            try {
+                await musicAudio.play();
+            } catch {
+                alert("브라우저가 재생을 다시 시작하지 못했습니다. 다시 눌러주세요.");
+            }
+        }
+
+        syncPlaybackUi();
+        updatePlaybackProgressUi();
+        await Promise.resolve(applyMusicTrackBackdrop()).catch(() => {});
+    };
+
+    handleRecordInteraction = async function() {
+        if (!musicState.selectedTrackId) {
+            normalizeSelectedTrack();
+            saveMusicState();
+            renderMusicUI();
+        }
+
+        const selectedTrack = getTrackById(musicState.selectedTrackId)
+            || getTrackById(getCurrentPlaylist()?.trackIds?.[0])
+            || null;
+
+        if (!selectedTrack) {
+            alert("먼저 재생할 음악을 선택해주세요.");
+            return;
+        }
+
+        musicState.selectedTrackId = selectedTrack.id;
+
+        if (musicState.playingTrackId === selectedTrack.id) {
+            await toggleCurrentPlayback(selectedTrack);
+            return;
+        }
+
+        await playSelectedTrack();
+    };
+}

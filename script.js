@@ -8838,37 +8838,6 @@ if (!window.__codexBackdropPausedFrameFixApplied) {
     };
 }
 
-if (!window.__codexBackdropVideoHostRecoveryApplied) {
-    window.__codexBackdropVideoHostRecoveryApplied = true;
-
-    const originalApplyMusicTrackBackdropForHostRecovery = applyMusicTrackBackdrop;
-    applyMusicTrackBackdrop = async function() {
-        const activeTrack = getTrackForMusicVisuals();
-        const playingTrack = getTrackById(musicState.playingTrackId);
-        const shouldUseBackdropVideo = Boolean(activeTrack?.customBackgroundVideoId)
-            && Boolean(playingTrack)
-            && activeTrack.id === playingTrack.id;
-
-        if (shouldUseBackdropVideo && musicVideoBackdropFrame && !musicVideoBackdropFrame.querySelector("iframe")) {
-            try {
-                if (musicBackgroundVideoPlayer && typeof musicBackgroundVideoPlayer.destroy === "function") {
-                    musicBackgroundVideoPlayer.destroy();
-                }
-            } catch (error) {
-                console.warn("Failed to recover music background video host", error);
-            }
-
-            musicBackgroundVideoPlayer = null;
-            musicBackgroundVideoPlayerReadyPromise = null;
-            lastAppliedMusicBackgroundVideoConfig = "";
-            musicVideoBackdropFrame.innerHTML = "";
-        }
-
-        await originalApplyMusicTrackBackdropForHostRecovery();
-    };
-}
-
-
 if (!window.__codexPlaylistWheelFixV2Applied) {
     window.__codexPlaylistWheelFixV2Applied = true;
 

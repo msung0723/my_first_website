@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magnus</title>
+    <link rel="icon" type="image/png" href="M.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <div class="header-left">
+            <button id="sidebar-toggle" class="icon-btn" type="button"><i class="fa-solid fa-bars"></i></button>
+            <img src="19155.png" alt="Magnus Logo" class="logo-image" id="logo-main">
+        </div>
+
+        <div class="nav-menu">
+            <div class="header-volume-control">
+                <button id="nav-volume-btn" class="icon-btn" type="button" aria-label="음량 조절"><i class="fa-solid fa-volume-high"></i></button>
+                <div id="header-volume-panel" class="header-volume-panel hidden">
+                    <input id="header-playback-volume" class="header-volume-slider" type="range" min="0" max="100" value="100" step="1" aria-label="음량">
+                </div>
+            </div>
+            <button id="nav-signup-btn" class="nav-btn" type="button">회원가입</button>
+            <button id="nav-login-btn" class="nav-btn hidden" type="button">로그인</button>
+            <div id="nav-profile-group" class="hidden">
+                <div id="header-profile-img-wrapper">
+                    <div id="default-avatar">?</div>
+                    <img id="header-profile-img" src="" alt="Profile" class="hidden">
+                </div>
+                <button id="nav-profile-btn" class="nav-btn" type="button">설정</button>
+                <button id="nav-logout-btn" class="nav-btn gray" type="button">로그아웃</button>
+            </div>
+        </div>
+    </header>
+
+    <nav id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+            <h3>메뉴</h3>
+            <button id="sidebar-close" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <ul class="sidebar-links">
+            <li class="active"><a href="#" id="menu-main"><i class="fa-solid fa-house"></i> 메인 화면</a></li>
+            <li><a href="#" id="menu-music"><i class="fa-solid fa-music"></i> 음악</a></li>
+            <li><a href="#" id="menu-video"><i class="fa-solid fa-photo-film"></i> 영상 저장소</a></li>
+        </ul>
+    </nav>
+
+    <div id="auth-container" class="hidden auth-overlay">
+        <div class="auth-box">
+            <h2>회원가입</h2>
+            <input type="text" id="signup-id" class="large-input" placeholder="아이디">
+            <input type="password" id="signup-pw" class="large-input" placeholder="비밀번호">
+            <button id="complete-signup" class="large-btn" type="button">가입 완료</button>
+        </div>
+    </div>
+
+    <div id="login-container" class="hidden auth-overlay">
+        <div class="auth-box">
+            <h2>로그인</h2>
+            <input type="text" id="login-id" class="large-input" placeholder="아이디">
+            <input type="password" id="login-pw" class="large-input" placeholder="비밀번호">
+            <button id="submit-login" class="large-btn" type="button">로그인하기</button>
+        </div>
+    </div>
+
+    <div id="shortcut-modal" class="hidden auth-overlay">
+        <div class="auth-box">
+            <h2>즐겨찾기 추가</h2>
+            <input type="text" id="shortcut-name" class="large-input" placeholder="사이트 이름">
+            <input type="text" id="shortcut-url" class="large-input" placeholder="사이트 주소 (예: naver.com)">
+            <button id="save-shortcut" class="large-btn" type="button">추가하기</button>
+        </div>
+    </div>
+
+    <div id="playlist-editor-modal" class="hidden auth-overlay">
+        <div class="auth-box playlist-editor-box">
+            <div class="playlist-editor-header">
+                <h2>재생목록 수정</h2>
+                <button id="close-playlist-editor" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="playlist-editor-top">
+                <select id="playlist-editor-select" class="large-input"></select>
+                <input type="text" id="playlist-name-input" class="large-input" placeholder="재생목록 이름">
+            </div>
+            <div class="playlist-editor-actions">
+                <button id="open-library-picker-btn" class="nav-btn" type="button">보관함에서 노래 선택</button>
+                <button id="new-playlist-btn" class="nav-btn" type="button">새 재생목록</button>
+                <button id="rename-playlist-btn" class="nav-btn" type="button">이름 저장</button>
+                <button id="delete-playlist-btn" class="nav-btn gray" type="button">재생목록 삭제</button>
+            </div>
+            <div class="playlist-edit-list" id="playlist-edit-list"></div>
+        </div>
+    </div>
+
+    <div id="music-add-modal" class="hidden auth-overlay">
+        <div class="auth-box music-add-box">
+            <div class="playlist-editor-header">
+                <h2>노래 추가</h2>
+                <button id="close-music-add" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="music-source-switch">
+                <button id="music-source-youtube" class="nav-btn is-active" type="button">유튜브 링크로 추가</button>
+                <button id="music-source-file" class="nav-btn" type="button">mp3로 추가</button>
+            </div>
+            <input type="text" id="music-title-input" class="large-input" placeholder="노래 제목">
+            <div id="youtube-source-panel" class="music-source-panel">
+                <input type="text" id="youtube-link-input" class="large-input" placeholder="유튜브 링크">
+                <p class="music-source-note">링크를 사용할 경우 동영상이 삭제되면 오류가 날 수 있습니다.</p>
+            </div>
+            <div id="file-source-panel" class="music-source-panel hidden">
+                <input type="file" id="music-file-input" accept="audio/mpeg,audio/mp3,audio/*" class="large-input">
+            </div>
+            <button id="save-music-btn" class="large-btn" type="button">추가하기</button>
+        </div>
+    </div>
+
+    <div id="video-add-modal" class="hidden auth-overlay">
+        <div class="auth-box music-add-box">
+            <div class="playlist-editor-header">
+                <h2>영상 추가</h2>
+                <button id="close-video-add" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="text" id="video-link-input" class="large-input" placeholder="유튜브 링크">
+            <input type="text" id="video-title-input" class="large-input" placeholder="영상 제목 (비워두면 원제 사용)">
+            <button id="save-video-btn" class="large-btn" type="button">영상 저장</button>
+        </div>
+    </div>
+
+    <div id="library-picker-modal" class="hidden auth-overlay">
+        <div class="auth-box playlist-editor-box">
+            <div class="playlist-editor-header">
+                <h2>보관함에서 노래 선택</h2>
+                <button id="close-library-picker" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="playlist-edit-list" id="library-picker-list"></div>
+        </div>
+    </div>
+
+    <div id="track-background-video-modal" class="hidden auth-overlay">
+        <div class="auth-box playlist-editor-box track-background-video-modal">
+            <div class="playlist-editor-header">
+                <h2>배경 영상 설정</h2>
+                <button id="close-track-background-video-modal" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <input type="text" id="track-background-video-url" class="large-input" placeholder="유튜브 링크">
+            <div class="track-background-video-preview">
+                <div id="track-background-video-player"></div>
+            </div>
+            <div class="track-background-video-controls">
+                <button id="track-background-video-toggle" class="nav-btn" type="button">재생 / 일시정지</button>
+                <button id="track-background-video-use-current" class="nav-btn gray" type="button">현재 위치를 시작점으로</button>
+            </div>
+            <div class="track-background-video-timeline">
+                <span id="track-background-video-current-time">0.00초</span>
+                <input id="track-background-video-range" type="range" min="0" max="0" step="0.01" value="0">
+                <span id="track-background-video-duration">0.00초</span>
+            </div>
+            <div class="track-background-video-start-readout">시작 지점: <strong id="track-background-video-start-display">0.00초</strong></div>
+            <div class="button-group">
+                <button id="save-track-background-video" class="large-btn" type="button">저장하기</button>
+                <button id="clear-track-background-video" class="nav-btn gray" type="button">영상 배경 삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="record-style-modal" class="hidden auth-overlay">
+        <div class="auth-box playlist-editor-box draggable-panel" data-draggable-panel="record-style">
+            <div class="playlist-editor-header draggable-handle">
+                <h2></h2>
+                <div class="panel-header-actions">
+                    <button id="open-record-effect-modal" class="mini-btn" type="button" aria-label="음반 효과 설정"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                    <button id="close-record-style-modal" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+            <div class="record-style-grid" id="record-style-grid"></div>
+        </div>
+    </div>
+    <div id="record-effect-modal" class="hidden auth-overlay">
+        <div class="auth-box playlist-editor-box draggable-panel" data-draggable-panel="record-effect">
+            <div class="playlist-editor-header draggable-handle">
+                <h2></h2>
+                <button id="close-record-effect-modal" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="record-effect-grid" id="record-effect-grid"></div>
+        </div>
+    </div>
+    <input type="file" id="track-art-input" accept="image/*" class="hidden">
+    <input type="file" id="track-background-input" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden">
+
+    <main id="main-page" class="welcome-container">
+        <div class="main-content">
+            <div class="main-logo-wrap" id="main-logo-wrap">
+                <img src="19155.png" alt="Magnus Logo" class="main-center-logo" id="main-center-logo">
+                <button id="main-logo-delete-btn" class="main-custom-delete" type="button">×</button>
+                <div id="logo-neon-hover-panel" class="logo-neon-hover-panel hidden">
+                    <span>로고 네온</span>
+                    <input type="color" id="logo-neon-hover-color" value="#62e7ff" aria-label="로고 네온 색상">
+                </div>
+            </div>
+            <h1 class="welcome-text" id="welcome-text">
+                <span id="user-name" class="editable-welcome" tabindex="0" role="button" aria-label="환영 문구 수정">아무개님 환영합니다</span>
+                <button id="welcome-delete-btn" class="main-custom-delete" type="button">×</button>
+            </h1>
+            <div id="shortcut-grid" class="shortcut-grid">
+                <button id="add-shortcut-btn" class="add-btn" type="button"><i class="fa-solid fa-plus"></i></button>
+            </div>
+            <div id="main-custom-layer" class="main-custom-layer"></div>
+        </div>
+        <div id="main-edit-controls" class="main-edit-controls">
+            <button id="main-edit-start-btn" class="nav-btn" type="button">수정</button>
+            <button id="main-edit-save-btn" class="nav-btn hidden" type="button">수정 완료하기</button>
+            <button id="main-edit-cancel-btn" class="nav-btn gray hidden" type="button">취소하기</button>
+            <button id="main-edit-reset-btn" class="nav-btn gray hidden" type="button">기본 상태로 되돌리기</button>
+        </div>
+        <div class="main-preset-controls">
+            <button id="main-preset-toggle-btn" class="nav-btn" type="button">프리셋</button>
+            <div id="main-preset-panel" class="main-preset-panel hidden">
+                <div class="main-preset-slot" data-slot="0">
+                    <strong>프리셋 1</strong>
+                    <div class="main-preset-actions">
+                        <button class="nav-btn preset-save-btn" data-slot="0" type="button">저장</button>
+                        <button class="nav-btn gray preset-apply-btn" data-slot="0" type="button">불러오기</button>
+                    </div>
+                </div>
+                <div class="main-preset-slot" data-slot="1">
+                    <strong>프리셋 2</strong>
+                    <div class="main-preset-actions">
+                        <button class="nav-btn preset-save-btn" data-slot="1" type="button">저장</button>
+                        <button class="nav-btn gray preset-apply-btn" data-slot="1" type="button">불러오기</button>
+                    </div>
+                </div>
+                <div class="main-preset-slot" data-slot="2">
+                    <strong>프리셋 3</strong>
+                    <div class="main-preset-actions">
+                        <button class="nav-btn preset-save-btn" data-slot="2" type="button">저장</button>
+                        <button class="nav-btn gray preset-apply-btn" data-slot="2" type="button">불러오기</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <div id="main-edit-context-menu" class="main-edit-context-menu hidden">
+        <button id="main-add-text-btn" type="button">문구 추가하기</button>
+        <button id="main-add-image-btn" type="button">이미지 추가하기</button>
+    </div>
+    <input type="file" id="main-custom-image-input" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden">
+    <div id="main-size-toolbar" class="main-size-toolbar hidden">
+        <span id="main-size-toolbar-label">크기</span>
+        <input id="main-size-range" type="range" min="40" max="220" step="1" value="100">
+        <label class="main-size-color-field">
+            <span>네온</span>
+            <input id="main-size-neon-color" type="color" value="#62e7ff">
+        </label>
+        <label class="main-size-color-field">
+            <span>강도</span>
+            <input id="main-size-neon-intensity" type="range" min="0" max="100" step="1" value="55">
+        </label>
+        <button id="main-size-delete-btn" class="nav-btn gray hidden" type="button">삭제</button>
+    </div>
+
+    <div id="welcome-toolbar" class="welcome-toolbar draggable-panel hidden" data-draggable-panel="welcome-toolbar">
+        <div class="welcome-toolbar-header draggable-handle">
+            <span>도구 창</span>
+        </div>
+        <div class="welcome-toolbar-body">
+            <label class="welcome-tool">
+                <span>글자색</span>
+                <input type="color" id="welcome-text-color" value="#111111">
+            </label>
+            <label class="welcome-tool">
+                <span>크기</span>
+                <input type="range" id="welcome-font-size" min="24" max="84" step="1" value="40">
+            </label>
+            <label class="welcome-tool">
+                <span>테두리</span>
+                <input type="color" id="welcome-stroke-color" value="#111111">
+            </label>
+            <label class="welcome-tool">
+                <span>폰트</span>
+                <select id="welcome-font-family">
+                    <option value="'Noto Sans KR', sans-serif">기본</option>
+                    <option value="'Nanum Gothic', sans-serif">나눔고딕</option>
+                    <option value="'Gowun Dodum', sans-serif">고운돋움</option>
+                    <option value="'Do Hyeon', sans-serif">도현</option>
+                    <option value="'Malgun Gothic', sans-serif">맑은 고딕</option>
+                    <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                    <option value="'Georgia', serif">Georgia</option>
+                    <option value="'Courier New', monospace">Courier</option>
+                </select>
+            </label>
+            <label class="checkbox-label welcome-tool-checkbox">
+                <input type="checkbox" id="welcome-neon-toggle">
+                네온 효과
+            </label>
+        </div>
+    </div>
+    <button id="welcome-toolbar-reset" class="welcome-toolbar-reset hidden" type="button">위치 되돌리기</button>
+    <div id="shortcut-toolbar" class="welcome-toolbar shortcut-toolbar hidden">
+        <div class="welcome-toolbar-header">
+            <span>즐겨찾기 텍스트</span>
+        </div>
+        <div class="welcome-toolbar-body">
+            <label class="welcome-tool">
+                <span>글자색</span>
+                <input type="color" id="shortcut-text-color" value="#333333">
+            </label>
+            <label class="welcome-tool">
+                <span>크기</span>
+                <input type="range" id="shortcut-font-size" min="10" max="36" step="1" value="13">
+            </label>
+            <label class="welcome-tool">
+                <span>테두리</span>
+                <input type="color" id="shortcut-stroke-color" value="#333333">
+            </label>
+            <label class="welcome-tool">
+                <span>폰트</span>
+                <select id="shortcut-font-family">
+                    <option value="'Noto Sans KR', sans-serif">기본</option>
+                    <option value="'Nanum Gothic', sans-serif">나눔고딕</option>
+                    <option value="'Gowun Dodum', sans-serif">고운돋움</option>
+                    <option value="'Do Hyeon', sans-serif">도현</option>
+                    <option value="'Malgun Gothic', sans-serif">맑은 고딕</option>
+                    <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
+                    <option value="'Georgia', serif">Georgia</option>
+                    <option value="'Courier New', monospace">Courier</option>
+                </select>
+            </label>
+            <label class="checkbox-label welcome-tool-checkbox">
+                <input type="checkbox" id="shortcut-neon-toggle">
+                네온 효과
+            </label>
+        </div>
+    </div>
+
+    <div id="profile-crop-modal" class="hidden auth-overlay">
+        <div class="auth-box profile-crop-box">
+            <div class="playlist-editor-header">
+                <h2>프로필 사진 조정</h2>
+                <button id="close-profile-crop" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="profile-crop-stage" class="profile-crop-stage">
+                <img id="profile-crop-image" alt="Profile Crop Preview">
+                <div class="profile-crop-mask"></div>
+            </div>
+            <label class="setting-item">
+                <span>확대</span>
+                <input id="profile-crop-zoom" type="range" min="1" max="3" step="0.01" value="1">
+            </label>
+            <div class="button-group">
+                <button id="save-profile-crop" class="large-btn" type="button">프로필로 사용하기</button>
+            </div>
+        </div>
+    </div>
+
+    <section id="profile-page" class="hidden">
+        <div class="profile-container">
+            <h2 class="section-title">설정</h2>
+            <div class="settings-tab-bar">
+                <button id="settings-tab-account" class="settings-tab is-active" type="button">계정 설정</button>
+                <button id="settings-tab-environment" class="settings-tab" type="button">환경 설정</button>
+            </div>
+            <div id="settings-panel-account" class="settings-panel is-active">
+                <div class="profile-layout">
+                    <div class="profile-left">
+                        <div id="profile-image-setup" class="image-upload-box">
+                            <i class="fa-solid fa-plus" id="preview-plus"></i>
+                            <img id="profile-preview" src="" alt="Profile Preview" class="hidden">
+                            <input type="file" id="image-input" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden">
+                        </div>
+                        <p class="info-text">사진을 눌러 변경하세요. 드래그와 확대 후 원형 프로필에 맞춰 저장할 수 있습니다.</p>
+                        <p class="info-text">GIF/WebP 움직이는 이미지 사용 가능, 최대 8MB까지 업로드할 수 있습니다.</p>
+                        <div id="profile-image-library" class="image-history-list"></div>
+                        <div class="setting-item">
+                            <label>테두리 색상</label>
+                            <input type="color" id="profile-border-color" value="#000000">
+                        </div>
+                        <div class="setting-item">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="rainbow-mode"> 무지개 애니메이션
+                            </label>
+                        </div>
+                    </div>
+                    <div class="profile-right">
+                        <div class="input-group">
+                            <label>이름 변경</label>
+                            <input type="text" id="change-id" class="large-input" placeholder="새로운 이름 입력">
+                        </div>
+                        <div class="input-group">
+                            <label>비밀번호 변경</label>
+                            <input type="password" id="change-pw" class="large-input" placeholder="새로운 비밀번호 입력">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="settings-panel-environment" class="settings-panel hidden">
+                <div class="environment-grid">
+                    <div class="environment-card">
+                        <h3>배경화면</h3>
+                        <div class="setting-item wallpaper-setting">
+                            <label>배경화면 설정</label>
+                            <p class="info-text">권장 해상도는 1920x1080 이상입니다. GIF/WebP 움직이는 배경도 사용할 수 있습니다.</p>
+                            <p class="info-text">배경 이미지는 최대 12MB까지 업로드할 수 있습니다.</p>
+                            <div class="wallpaper-actions">
+                                <button id="background-image-setup" class="nav-btn" type="button">사진 업로드</button>
+                                <button id="reset-background-image" class="nav-btn gray" type="button">기본 이미지로 설정</button>
+                            </div>
+                            <div id="background-image-library" class="image-history-list"></div>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="apply-header-wallpaper"> 상단 바 적용
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="apply-music-header-wallpaper" checked> 음악 탭에서 상단 바에도 음악 배경 적용
+                            </label>
+                            <label>음악 배경 불투명도</label>
+                            <input type="range" id="music-background-opacity" min="0" max="100" value="100" class="large-input">
+                            <p class="info-text">음악별 배경이 설정되어 있으면 이 값만큼 위에 덮어씌워집니다. 배경이 없으면 환경설정 배경만 사용됩니다.</p>
+                            <input type="file" id="background-image-input" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden">
+                        </div>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="header-fixed-toggle" checked> 상단 바 고정
+                        </label>
+                    </div>
+                    <div class="environment-card">
+                        <h3>마우스 포인터</h3>
+                        <div class="setting-item">
+                            <label>포인터 모양</label>
+                            <select id="cursor-style-select" class="large-input">
+                                <option value="default">기본</option>
+                                <option value="pointer">손가락</option>
+                                <option value="crosshair">십자선</option>
+                                <option value="grab">잡기</option>
+                                <option value="cell">셀</option>
+                                <option value="help">도움말</option>
+                            </select>
+                        </div>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="show-shortcuts-toggle" checked> 즐겨찾기 보이기
+                        </label>
+                    </div>
+                    <div class="environment-card">
+                        <h3>음반</h3>
+                        <div class="setting-item">
+                            <label>음반 투명도</label>
+                            <input type="range" id="record-disc-opacity" min="0" max="100" value="100" class="large-input">
+                            <p class="info-text">음반 자체의 투명도를 조절합니다. 0이면 완전히 투명, 100이면 불투명입니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="button-group">
+                <button id="save-settings" class="large-btn" type="button">설정 저장하기</button>
+                <button id="back-to-main" class="nav-btn gray" type="button">메인으로 돌아가기</button>
+            </div>
+        </div>
+    </section>
+
+    <section id="music-page" class="hidden">
+        <div id="music-video-backdrop" class="music-video-backdrop hidden">
+            <div id="music-video-backdrop-frame"></div>
+        </div>
+        <div class="music-layout">
+            <div class="music-center">
+                <span class="now-playing-label">Now Playing</span>
+                <div class="record-wrapper">
+                    <button class="record-disc" id="record-disc" type="button" aria-label="선택한 음악 재생">
+                        <div class="record-cover-art" id="record-cover-art"></div>
+                        <div class="cd-shine"></div>
+                        <div class="record-label">
+                            <div class="label-dot"></div>
+                            <div class="label-ring ring-one"></div>
+                            <div class="label-ring ring-two"></div>
+                        </div>
+                    </button>
+                </div>
+                <div class="record-hint" id="record-hint">재생할 음악을 선택한 뒤 음반을 눌러주세요</div>
+                <div class="now-playing-title" id="now-playing-title">선택된 음악 없음</div>
+                <div class="playback-bar">
+                    <button class="playback-circle-btn" id="transport-toggle" type="button" aria-label="재생 또는 일시정지">
+                        <i class="fa-solid fa-play" id="transport-toggle-icon"></i>
+                    </button>
+                    <span class="playback-time" id="playback-current-time">0:00</span>
+                    <input id="playback-progress" class="playback-progress" type="range" min="0" max="100" value="0" step="0.1" aria-label="재생 위치">
+                    <span class="playback-time" id="playback-duration">0:00</span>
+                    <div class="playback-volume-wrap">
+                        <i class="fa-solid fa-volume-high"></i>
+                        <input id="playback-volume" class="playback-volume" type="range" min="0" max="100" value="100" step="1" aria-label="음량">
+                    </div>
+                    <button class="playback-mode-btn" id="repeat-toggle" type="button" aria-pressed="false">
+                        <i class="fa-solid fa-repeat"></i>
+                        <span>무한재생</span>
+                    </button>
+                    <button class="playback-mode-btn" id="autoplay-toggle" type="button" aria-pressed="false">
+                        <i class="fa-solid fa-forward-step"></i>
+                        <span>다음 곡 자동재생</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="music-playlist">
+                <div class="record-tool-row">
+                    <button id="record-style-btn" class="record-style-btn" type="button">
+                        <span class="record-style-preview" id="record-style-preview">
+                            <span class="record-style-preview-disc" id="record-style-preview-disc"></span>
+                        </span>
+                    </button>
+                </div>
+                <div class="music-top-actions">
+                    <button id="add-music-btn" class="nav-btn" type="button">노래 추가</button>
+                    <button id="edit-playlist-btn" class="nav-btn" type="button">재생목록 수정</button>
+                </div>
+                <div class="playlist-switcher">
+                    <button class="playlist-switch-btn" id="playlist-prev" type="button" aria-label="이전 재생목록">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <div class="playlist-name" id="playlist-name">기본 재생목록</div>
+                    <button class="playlist-switch-btn" id="playlist-next" type="button" aria-label="다음 재생목록">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+                <button class="playlist-arrow" id="playlist-up" type="button" aria-label="이전 곡">
+                    <i class="fa-solid fa-chevron-up"></i>
+                </button>
+                <div class="playlist-items" id="playlist-items"></div>
+                <button class="playlist-arrow" id="playlist-down" type="button" aria-label="다음 곡">
+                    <i class="fa-solid fa-chevron-down"></i>
+                </button>
+                <div class="music-empty hidden" id="music-empty-state">업로드한 노래가 아직 없습니다</div>
+            </div>
+        </div>
+        <div class="music-edit-controls">
+            <button id="music-style-edit-btn" class="nav-btn" type="button">음악 탭 수정</button>
+            <button id="music-style-close-btn" class="nav-btn gray hidden" type="button">수정 종료</button>
+        </div>
+        <div id="music-style-panel" class="music-style-panel hidden">
+            <div class="music-style-section">
+                <h3>재생 바</h3>
+                <label><span>배경색</span><input id="music-bar-bg-color" type="color" value="#ffffff"></label>
+                <label><span>테두리색</span><input id="music-bar-border-color" type="color" value="#111111"></label>
+                <label><span>네온색</span><input id="music-bar-neon-color" type="color" value="#74d6ff"></label>
+                <label><span>투명도</span><input id="music-bar-opacity" type="range" min="0.2" max="1" step="0.01" value="0.9"></label>
+                <div class="music-opacity-targets">
+                    <label><input id="music-bar-opacity-fill" type="checkbox" checked> 안쪽</label>
+                    <label><input id="music-bar-opacity-border" type="checkbox"> 테두리</label>
+                    <label><input id="music-bar-opacity-neon" type="checkbox"> 네온</label>
+                </div>
+            </div>
+            <div class="music-style-section">
+                <h3>글자 / 아이콘</h3>
+                <label><span>색상</span><input id="music-text-color" type="color" value="#111111"></label>
+                <label><span>테두리색</span><input id="music-text-stroke-color" type="color" value="#111111"></label>
+                <label><span>네온색</span><input id="music-text-neon-color" type="color" value="#74d6ff"></label>
+                <label><span>투명도</span><input id="music-text-opacity" type="range" min="0.2" max="1" step="0.01" value="1"></label>
+                <div class="music-opacity-targets">
+                    <label><input id="music-text-opacity-fill" type="checkbox" checked> 안쪽</label>
+                    <label><input id="music-text-opacity-border" type="checkbox"> 테두리</label>
+                    <label><input id="music-text-opacity-neon" type="checkbox"> 네온</label>
+                </div>
+            </div>
+            <div class="music-style-section">
+                <h3>Now Playing / 현재 재생</h3>
+                <label><span>색상</span><input id="music-now-color" type="color" value="#111111"></label>
+                <label><span>테두리색</span><input id="music-now-stroke-color" type="color" value="#111111"></label>
+                <label><span>네온색</span><input id="music-now-neon-color" type="color" value="#74d6ff"></label>
+                <label><span>투명도</span><input id="music-now-opacity" type="range" min="0.2" max="1" step="0.01" value="1"></label>
+                <div class="music-opacity-targets">
+                    <label><input id="music-now-opacity-fill" type="checkbox" checked> 안쪽</label>
+                    <label><input id="music-now-opacity-border" type="checkbox"> 테두리</label>
+                    <label><input id="music-now-opacity-neon" type="checkbox"> 네온</label>
+                </div>
+            </div>
+            <div class="music-style-section">
+                <h3>재생 진행 바</h3>
+                <label><span>색상</span><input id="music-progress-color" type="color" value="#69d2ff"></label>
+                <label><span>테두리색</span><input id="music-progress-border-color" type="color" value="#69d2ff"></label>
+                <label><span>네온색</span><input id="music-progress-neon-color" type="color" value="#69d2ff"></label>
+                <label><span>투명도</span><input id="music-progress-opacity" type="range" min="0.2" max="1" step="0.01" value="1"></label>
+                <div class="music-opacity-targets">
+                    <label><input id="music-progress-opacity-fill" type="checkbox" checked> 안쪽</label>
+                    <label><input id="music-progress-opacity-border" type="checkbox"> 테두리</label>
+                    <label><input id="music-progress-opacity-neon" type="checkbox"> 네온</label>
+                </div>
+            </div>
+            <div class="music-style-section">
+                <h3>음반</h3>
+                <label><span>테두리 네온색</span><input id="music-record-neon-color" type="color" value="#74d6ff"></label>
+                <label><span>투명도</span><input id="music-record-opacity" type="range" min="0" max="1" step="0.01" value="1"></label>
+                <div class="music-opacity-targets">
+                    <label><input id="music-record-opacity-fill" type="checkbox" checked> 안쪽</label>
+                    <label><input id="music-record-opacity-border" type="checkbox"> 테두리</label>
+                    <label><input id="music-record-opacity-neon" type="checkbox"> 네온</label>
+                </div>
+            </div>
+            <div class="music-style-section">
+                <h3>배경 영상</h3>
+                <label><span>투명도</span><input id="music-backdrop-opacity" type="range" min="0" max="1" step="0.01" value="1"></label>
+            </div>
+            <div class="music-style-section">
+                <h3>음악 목록 휠</h3>
+                <label><span>휠 감도</span><input id="music-wheel-sensitivity" type="range" min="1" max="100" step="1" value="55"></label>
+            </div>
+            <div class="music-style-section">
+                <h3>오른쪽 버튼들</h3>
+                <label><span>배경색</span><input id="music-action-bg-color" type="color" value="#ffffff"></label>
+                <label><span>테두리색</span><input id="music-action-border-color" type="color" value="#dddddd"></label>
+                <label><span>네온색</span><input id="music-action-neon-color" type="color" value="#74d6ff"></label>
+                <label><span>버튼 투명도</span><input id="music-action-opacity" type="range" min="0.2" max="1" step="0.01" value="1"></label>
+                <div class="music-opacity-targets">
+                    <label><input id="music-action-opacity-fill" type="checkbox" checked> 안쪽</label>
+                    <label><input id="music-action-opacity-border" type="checkbox"> 테두리</label>
+                    <label><input id="music-action-opacity-neon" type="checkbox"> 네온</label>
+                </div>
+                <label><span>글자색</span><input id="music-action-text-color" type="color" value="#333333"></label>
+                <label><span>글자 테두리색</span><input id="music-action-text-stroke-color" type="color" value="#333333"></label>
+                <label><span>글자 네온색</span><input id="music-action-text-neon-color" type="color" value="#74d6ff"></label>
+                <label><span>글자 투명도</span><input id="music-action-text-opacity" type="range" min="0.2" max="1" step="0.01" value="1"></label>
+                <div class="music-opacity-targets">
+                    <label><input id="music-action-text-opacity-fill" type="checkbox" checked> 안쪽</label>
+                    <label><input id="music-action-text-opacity-border" type="checkbox"> 테두리</label>
+                    <label><input id="music-action-text-opacity-neon" type="checkbox"> 네온</label>
+                </div>
+            </div>
+        </div>
+
+        <audio id="music-audio" preload="metadata"></audio>
+        <div id="youtube-player-host" class="hidden">
+            <div id="youtube-player"></div>
+        </div>
+    </section>
+
+    <section id="video-page" class="hidden">
+        <div class="video-storage-page">
+            <div class="video-storage-topbar">
+                <div class="video-search-wrap">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="video-search-input" placeholder="제목, 설명, 태그 검색">
+                </div>
+                <button id="video-tag-filter-toggle" class="nav-btn" type="button">태그로 검색</button>
+            </div>
+            <button id="video-trash-toggle" class="nav-btn video-trash-btn" type="button">휴지통</button>
+            <div id="video-tag-filter-panel" class="video-tag-filter-panel hidden">
+                <div id="video-selected-tags" class="video-tag-row"></div>
+                <div id="video-all-tags" class="video-tag-row"></div>
+            </div>
+            <div id="video-grid" class="video-grid"></div>
+            <div id="video-empty" class="video-empty hidden">아직 저장된 영상이 없습니다.</div>
+            <button id="video-add-fab" class="video-add-fab" type="button" aria-label="영상 추가">
+                <i class="fa-solid fa-plus"></i>
+            </button>
+        </div>
+
+        <div id="video-viewer" class="video-viewer hidden">
+            <button id="video-viewer-backdrop" class="video-viewer-backdrop" type="button" aria-label="영상 창 닫기"></button>
+            <div class="video-viewer-shell">
+                <div class="video-player-stage">
+                    <div class="video-player-frame-host" id="video-player-main-host"></div>
+                </div>
+                <div class="video-info-panel">
+                    <input type="text" id="video-editor-title" class="video-editor-title" placeholder="영상 제목">
+                    <textarea id="video-editor-description" class="video-editor-description" placeholder="영상 설명을 적어주세요"></textarea>
+                    <div class="video-tag-editor">
+                        <input type="text" id="video-tag-input" class="video-tag-input" placeholder="태그 입력">
+                        <button id="video-add-tag-btn" class="nav-btn" type="button">추가</button>
+                    </div>
+                    <button id="video-save-meta-btn" class="nav-btn" type="button">저장하기</button>
+                    <div id="video-current-tags" class="video-current-tags"></div>
+                    <div class="video-viewer-actions">
+                        <button id="video-delete-btn" class="playback-circle-btn" type="button" aria-label="영상 삭제">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                        <button id="video-mini-btn" class="playback-circle-btn" type="button" aria-label="작은 화면으로 보기">
+                            <i class="fa-solid fa-down-left-and-up-right-to-center"></i>
+                        </button>
+                        <button id="video-close-btn" class="video-close-action" type="button" aria-label="영상 창 닫기">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="mini-video-player" class="mini-video-player hidden draggable-panel" data-draggable-panel="mini-video">
+            <div class="mini-video-header draggable-handle">
+                <span id="mini-video-title">영상 재생 중</span>
+                <div class="panel-header-actions">
+                    <button id="mini-video-open-btn" class="mini-btn" type="button" aria-label="큰 화면으로 열기"><i class="fa-solid fa-up-right-and-down-left-from-center"></i></button>
+                    <button id="mini-video-close-btn" class="mini-btn" type="button" aria-label="닫기"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+            <div class="mini-video-body" id="video-player-mini-host"></div>
+            <div class="mini-video-resize-edge mini-video-resize-right" data-resize-dir="right" aria-hidden="true"></div>
+            <div class="mini-video-resize-edge mini-video-resize-bottom" data-resize-dir="bottom" aria-hidden="true"></div>
+            <div class="mini-video-resize-edge mini-video-resize-corner" data-resize-dir="corner" aria-hidden="true"></div>
+            <button id="mini-video-resize-handle" class="mini-video-resize-handle" type="button" aria-label="작은 화면 크기 조절">
+                <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+            </button>
+        </div>
+
+        <iframe
+            id="video-player-frame"
+            class="hidden"
+            src=""
+            title="YouTube video player"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen>
+        </iframe>
+
+        <div id="video-trash-modal" class="hidden auth-overlay">
+            <div class="auth-box playlist-editor-box">
+                <div class="playlist-editor-header">
+                    <h3>영상 휴지통</h3>
+                    <button id="close-video-trash" class="icon-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="playlist-edit-list" id="video-trash-list"></div>
+            </div>
+        </div>
+    </section>
+
+    <script src="script.js"></script>
+</body>
+</html>

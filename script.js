@@ -9019,6 +9019,13 @@ if (!window.__codexFinalBackdropStabilizeApplied) {
                             videoId: backgroundVideoId,
                             startSeconds: targetTime
                         });
+                        window.setTimeout(() => {
+                            try {
+                                if (typeof player.playVideo === "function") {
+                                    player.playVideo();
+                                }
+                            } catch {}
+                        }, 120);
                     } else if (typeof player.cueVideoById === "function") {
                         player.cueVideoById({
                             videoId: backgroundVideoId,
@@ -9083,5 +9090,36 @@ if (!window.__codexFinalBackdropStabilizeApplied) {
             void musicPage.offsetWidth;
             musicPage.classList.add("track-backdrop-refresh");
         }
+    };
+}
+
+if (!window.__codexBackdropTriggerReinforceApplied) {
+    window.__codexBackdropTriggerReinforceApplied = true;
+
+    const syncBackdropSoon = (delay = 0) => {
+        window.setTimeout(() => {
+            Promise.resolve(applyMusicTrackBackdrop()).catch((error) => {
+                console.warn("Failed to reinforce music backdrop sync", error);
+            });
+        }, delay);
+    };
+
+    const originalSyncPlaybackUiForBackdropTrigger = syncPlaybackUi;
+    syncPlaybackUi = function() {
+        originalSyncPlaybackUiForBackdropTrigger();
+        syncBackdropSoon(20);
+    };
+
+    if (musicAudio) {
+        musicAudio.addEventListener("play", () => syncBackdropSoon(20));
+        musicAudio.addEventListener("pause", () => syncBackdropSoon(20));
+        musicAudio.addEventListener("seeked", () => syncBackdropSoon(20));
+        musicAudio.addEventListener("loadedmetadata", () => syncBackdropSoon(20));
+    }
+
+    const originalShowPageForBackdropTrigger = showPage;
+    showPage = function(pageId, options) {
+        originalShowPageForBackdropTrigger(pageId, options);
+        syncBackdropSoon(20);
     };
 }

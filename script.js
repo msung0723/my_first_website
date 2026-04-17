@@ -9085,3 +9085,39 @@ if (!window.__codexFinalBackdropStabilizeApplied) {
         }
     };
 }
+
+if (!window.__codexBackdropThumbnailOnlyFixApplied) {
+    window.__codexBackdropThumbnailOnlyFixApplied = true;
+    let lastBackdropRepairAt = 0;
+
+    const originalApplyMusicTrackBackdropForThumbnailFix = applyMusicTrackBackdrop;
+    applyMusicTrackBackdrop = async function() {
+        const activeTrack = getTrackForMusicVisuals();
+        const playingTrack = getTrackById(musicState.playingTrackId);
+        const shouldPlayVideoBackdrop = Boolean(activeTrack?.customBackgroundVideoId)
+            && Boolean(playingTrack)
+            && activeTrack.id === playingTrack.id
+            && isPlaybackActive();
+
+        const hasIframeHost = Boolean(musicVideoBackdropFrame);
+        const hasEmbeddedFrame = hasIframeHost && Boolean(musicVideoBackdropFrame.querySelector("iframe"));
+        const now = Date.now();
+
+        if (shouldPlayVideoBackdrop && musicBackgroundVideoPlayer && hasIframeHost && !hasEmbeddedFrame && now - lastBackdropRepairAt > 1200) {
+            lastBackdropRepairAt = now;
+            try {
+                if (typeof musicBackgroundVideoPlayer.destroy === "function") {
+                    musicBackgroundVideoPlayer.destroy();
+                }
+            } catch (error) {
+                console.warn("Failed to repair thumbnail-only backdrop player", error);
+            }
+            musicBackgroundVideoPlayer = null;
+            musicBackgroundVideoPlayerReadyPromise = null;
+            lastAppliedMusicBackgroundVideoConfig = "";
+            musicVideoBackdropFrame.innerHTML = "";
+        }
+
+        await originalApplyMusicTrackBackdropForThumbnailFix();
+    };
+}

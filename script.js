@@ -8736,6 +8736,75 @@ if (!window.__codexPlaybackInteractionFixV4Applied) {
     };
 }
 
+if (!window.__codexBackdropIframeCleanupFixApplied) {
+    window.__codexBackdropIframeCleanupFixApplied = true;
+
+    const originalApplyMusicTrackBackdropForIframeCleanup = applyMusicTrackBackdrop;
+    applyMusicTrackBackdrop = async function() {
+        await originalApplyMusicTrackBackdropForIframeCleanup();
+
+        const activeTrack = getTrackForMusicVisuals();
+        const playingTrack = getTrackById(musicState.playingTrackId);
+        const shouldKeepBackdropVideo = Boolean(activeTrack?.customBackgroundVideoId)
+            && Boolean(playingTrack)
+            && activeTrack.id === playingTrack.id
+            && isPlaybackActive();
+
+        if (!musicVideoBackdropFrame) return;
+
+        if (!shouldKeepBackdropVideo) {
+            musicVideoBackdropFrame.classList.add("hidden");
+            musicVideoBackdropFrame.style.visibility = "hidden";
+            musicVideoBackdropFrame.style.opacity = "0";
+            musicVideoBackdropFrame.style.pointerEvents = "none";
+            musicVideoBackdropFrame.innerHTML = "";
+            return;
+        }
+
+        musicVideoBackdropFrame.classList.remove("hidden");
+        musicVideoBackdropFrame.style.visibility = "visible";
+        musicVideoBackdropFrame.style.opacity = "1";
+        musicVideoBackdropFrame.style.pointerEvents = "none";
+    };
+}
+
+if (!window.__codexPlaybackSeekKeyFixApplied) {
+    window.__codexPlaybackSeekKeyFixApplied = true;
+
+    const isTypingContext = (target) => {
+        if (!target) return false;
+        const tagName = String(target.tagName || "").toUpperCase();
+        if (tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT") return true;
+        return Boolean(target.isContentEditable || target.closest?.("[contenteditable='true']"));
+    };
+
+    document.addEventListener("keydown", (event) => {
+        if (event.defaultPrevented) return;
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+        if (isTypingContext(event.target)) return;
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        const activeTrack = getTrackById(musicState.playingTrackId)
+            || getTrackById(musicState.selectedTrackId)
+            || getTrackById(getCurrentPlaylist()?.trackIds?.[0])
+            || null;
+        if (!activeTrack) return;
+
+        if (!musicState.playingTrackId && musicState.selectedTrackId !== activeTrack.id) {
+            musicState.selectedTrackId = activeTrack.id;
+            saveMusicState();
+        }
+
+        const { currentTime, duration } = getPlaybackMetrics();
+        const baseTime = Number.isFinite(currentTime) ? currentTime : 0;
+
+        event.preventDefault();
+        const delta = event.key === "ArrowRight" ? 5 : -5;
+        const nextTime = Math.max(0, Math.min(Number.isFinite(duration) && duration > 0 ? duration : baseTime + delta, baseTime + delta));
+        seekPlayback(nextTime);
+        updatePlaybackProgressUi();
+    });
+}
+
 if (!window.__codexPlaylistWheelFixV2Applied) {
     window.__codexPlaylistWheelFixV2Applied = true;
 

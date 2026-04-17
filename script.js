@@ -9121,3 +9121,48 @@ if (!window.__codexBackdropTriggerReinforceApplied) {
         syncBackdropSoon(20);
     };
 }
+
+if (!window.__codexBackdropSingleRepairApplied) {
+    window.__codexBackdropSingleRepairApplied = true;
+    let lastBackdropRepairKey = "";
+
+    const originalApplyMusicTrackBackdropForSingleRepair = applyMusicTrackBackdrop;
+    applyMusicTrackBackdrop = async function() {
+        const activeTrack = getTrackForMusicVisuals();
+        const playingTrack = getTrackById(musicState.playingTrackId);
+        const backgroundVideoId = activeTrack?.customBackgroundVideoId || "";
+        const backgroundVideoStart = Math.max(0, Number(activeTrack?.customBackgroundVideoStart || 0));
+        const repairKey = backgroundVideoId ? `${backgroundVideoId}@${backgroundVideoStart}` : "";
+        const shouldRepair = Boolean(backgroundVideoId)
+            && Boolean(playingTrack)
+            && activeTrack?.id === playingTrack.id
+            && isPlaybackActive()
+            && Boolean(musicVideoBackdropFrame)
+            && !musicVideoBackdropFrame.querySelector("iframe")
+            && lastBackdropRepairKey !== repairKey;
+
+        if (!repairKey) {
+            lastBackdropRepairKey = "";
+        }
+
+        if (shouldRepair) {
+            lastBackdropRepairKey = repairKey;
+            try {
+                if (musicBackgroundVideoPlayer && typeof musicBackgroundVideoPlayer.destroy === "function") {
+                    musicBackgroundVideoPlayer.destroy();
+                }
+            } catch (error) {
+                console.warn("Failed to run one-time backdrop repair", error);
+            }
+
+            musicBackgroundVideoPlayer = null;
+            musicBackgroundVideoPlayerReadyPromise = null;
+            lastAppliedMusicBackgroundVideoConfig = "";
+            if (musicVideoBackdropFrame) {
+                musicVideoBackdropFrame.innerHTML = "";
+            }
+        }
+
+        await originalApplyMusicTrackBackdropForSingleRepair();
+    };
+}

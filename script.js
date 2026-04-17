@@ -8654,6 +8654,12 @@ if (!window.__codexBackdropPauseUiFixApplied) {
 if (!window.__codexPlaybackInteractionFixV4Applied) {
     window.__codexPlaybackInteractionFixV4Applied = true;
 
+    const queueBackdropRefreshAfterPlaybackAction = () => {
+        window.setTimeout(() => {
+            Promise.resolve(applyMusicTrackBackdrop()).catch(() => {});
+        }, 0);
+    };
+
     toggleCurrentPlayback = async function(track) {
         if (!track) return;
 
@@ -8681,7 +8687,7 @@ if (!window.__codexPlaybackInteractionFixV4Applied) {
 
             syncPlaybackUi();
             updatePlaybackProgressUi();
-            await Promise.resolve(applyMusicTrackBackdrop()).catch(() => {});
+            queueBackdropRefreshAfterPlaybackAction();
             return;
         }
 
@@ -8706,7 +8712,7 @@ if (!window.__codexPlaybackInteractionFixV4Applied) {
 
         syncPlaybackUi();
         updatePlaybackProgressUi();
-        await Promise.resolve(applyMusicTrackBackdrop()).catch(() => {});
+        queueBackdropRefreshAfterPlaybackAction();
     };
 
     handleRecordInteraction = async function() {

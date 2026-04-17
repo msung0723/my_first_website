@@ -8868,6 +8868,86 @@ if (!window.__codexBackdropVideoHostRecoveryApplied) {
     };
 }
 
+if (!window.__codexBackdropDirectPlayerSyncApplied) {
+    window.__codexBackdropDirectPlayerSyncApplied = true;
+
+    const syncBackdropPlayerToPlayback = async (forceSeek = false) => {
+        const activeTrack = getTrackForMusicVisuals();
+        const playingTrack = getTrackById(musicState.playingTrackId);
+        const shouldUseBackdropVideo = Boolean(activeTrack?.customBackgroundVideoId)
+            && Boolean(playingTrack)
+            && activeTrack.id === playingTrack.id;
+
+        if (!shouldUseBackdropVideo) return;
+
+        const player = await ensureMusicBackgroundVideoPlayer();
+        if (!player) return;
+
+        const playbackMetrics = getPlaybackMetrics();
+        const playbackOffset = Math.max(0, Number(playbackMetrics.currentTime || 0));
+        const backgroundVideoStart = Math.max(0, Number(activeTrack.customBackgroundVideoStart || 0));
+        const targetTime = Math.max(0, backgroundVideoStart + playbackOffset);
+        const videoConfig = `${activeTrack.customBackgroundVideoId}@${backgroundVideoStart}`;
+        const currentVideoData = typeof player.getVideoData === "function" ? player.getVideoData() : null;
+        const currentVideoId = currentVideoData?.video_id || "";
+        const requiresReload = currentVideoId !== activeTrack.customBackgroundVideoId
+            || lastAppliedMusicBackgroundVideoConfig !== videoConfig;
+
+        if (typeof player.mute === "function") {
+            player.mute();
+        }
+
+        if (requiresReload && typeof player.loadVideoById === "function") {
+            lastAppliedMusicBackgroundVideoConfig = videoConfig;
+            player.loadVideoById({
+                videoId: activeTrack.customBackgroundVideoId,
+                startSeconds: targetTime
+            });
+        } else {
+            const currentVideoTime = typeof player.getCurrentTime === "function"
+                ? Number(player.getCurrentTime() || 0)
+                : 0;
+            if ((forceSeek || Math.abs(currentVideoTime - targetTime) > 0.75) && typeof player.seekTo === "function") {
+                player.seekTo(targetTime, true);
+            }
+        }
+
+        if (musicVideoBackdropFrame) {
+            musicVideoBackdropFrame.classList.remove("hidden");
+            musicVideoBackdropFrame.style.visibility = "visible";
+            musicVideoBackdropFrame.style.opacity = "1";
+            musicVideoBackdropFrame.style.pointerEvents = "none";
+        }
+
+        if (isPlaybackActive()) {
+            if (typeof player.playVideo === "function") {
+                player.playVideo();
+            }
+        } else if (typeof player.pauseVideo === "function") {
+            player.pauseVideo();
+        }
+    };
+
+    const requestBackdropPlayerSync = (forceSeek = false) => {
+        Promise.resolve(syncBackdropPlayerToPlayback(forceSeek)).catch((error) => {
+            console.warn("Failed to directly sync backdrop player", error);
+        });
+    };
+
+    const originalSyncPlaybackUiForBackdropDirectSync = syncPlaybackUi;
+    syncPlaybackUi = function() {
+        originalSyncPlaybackUiForBackdropDirectSync();
+        requestBackdropPlayerSync(false);
+    };
+
+    if (musicAudio) {
+        musicAudio.addEventListener("play", () => requestBackdropPlayerSync(true));
+        musicAudio.addEventListener("pause", () => requestBackdropPlayerSync(true));
+        musicAudio.addEventListener("seeked", () => requestBackdropPlayerSync(true));
+        musicAudio.addEventListener("loadedmetadata", () => requestBackdropPlayerSync(true));
+    }
+}
+
 if (!window.__codexPlaylistWheelFixV2Applied) {
     window.__codexPlaylistWheelFixV2Applied = true;
 

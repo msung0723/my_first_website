@@ -9003,8 +9003,6 @@ if (!window.__codexFinalBackdropStabilizeApplied) {
             const player = await ensureMusicBackgroundVideoPlayer();
             if (player) {
                 const videoConfig = `${backgroundVideoId}@${backgroundVideoStart}`;
-                const currentVideoData = typeof player.getVideoData === "function" ? player.getVideoData() : null;
-                const currentVideoId = currentVideoData?.video_id || "";
                 const playbackMetrics = getPlaybackMetrics();
                 const playbackOffset = Math.max(0, Number(playbackMetrics.currentTime || 0));
                 const targetTime = Math.max(0, backgroundVideoStart + playbackOffset);
@@ -9014,7 +9012,7 @@ if (!window.__codexFinalBackdropStabilizeApplied) {
                     player.mute();
                 }
 
-                if (currentVideoId !== backgroundVideoId || lastAppliedMusicBackgroundVideoConfig !== videoConfig) {
+                if (lastAppliedMusicBackgroundVideoConfig !== videoConfig) {
                     lastAppliedMusicBackgroundVideoConfig = videoConfig;
                     if (shouldPlay && typeof player.loadVideoById === "function") {
                         player.loadVideoById({

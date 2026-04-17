@@ -8802,7 +8802,41 @@ if (!window.__codexPlaybackSeekKeyFixApplied) {
         const nextTime = Math.max(0, Math.min(Number.isFinite(duration) && duration > 0 ? duration : baseTime + delta, baseTime + delta));
         seekPlayback(nextTime);
         updatePlaybackProgressUi();
+        Promise.resolve(applyMusicTrackBackdrop()).catch(() => {});
     });
+}
+
+if (!window.__codexBackdropPausedFrameFixApplied) {
+    window.__codexBackdropPausedFrameFixApplied = true;
+
+    const originalApplyMusicTrackBackdropForPausedFrame = applyMusicTrackBackdrop;
+    applyMusicTrackBackdrop = async function() {
+        await originalApplyMusicTrackBackdropForPausedFrame();
+
+        if (!musicVideoBackdropFrame) return;
+
+        const activeTrack = getTrackForMusicVisuals();
+        const playingTrack = getTrackById(musicState.playingTrackId);
+        const sameTrackVideo = Boolean(activeTrack?.customBackgroundVideoId)
+            && Boolean(playingTrack)
+            && activeTrack.id === playingTrack.id;
+
+        const shouldKeepBackdropVideo = sameTrackVideo && (isPlaybackActive() || isPlaybackPaused());
+
+        if (!shouldKeepBackdropVideo) {
+            musicVideoBackdropFrame.classList.add("hidden");
+            musicVideoBackdropFrame.style.visibility = "hidden";
+            musicVideoBackdropFrame.style.opacity = "0";
+            musicVideoBackdropFrame.style.pointerEvents = "none";
+            musicVideoBackdropFrame.innerHTML = "";
+            return;
+        }
+
+        musicVideoBackdropFrame.classList.remove("hidden");
+        musicVideoBackdropFrame.style.visibility = "visible";
+        musicVideoBackdropFrame.style.opacity = "1";
+        musicVideoBackdropFrame.style.pointerEvents = "none";
+    };
 }
 
 if (!window.__codexPlaylistWheelFixV2Applied) {

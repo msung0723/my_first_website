@@ -757,7 +757,6 @@ body.has-custom-wallpaper #music-page.has-track-background::before {
     --music-record-border: 116,214,255;
     --music-record-neon: 116,214,255;
     --music-record-opacity: 1;
-    --music-record-disc-opacity: 1;
     --music-record-border-opacity: 0.04;
     --music-record-neon-opacity: 0.32;
     --music-action-bg: 255,255,255;
@@ -1381,7 +1380,7 @@ body.header-unfixed #video-page { padding-top: 28px; }
     border: none;
     cursor: pointer;
     background: transparent;
-    opacity: var(--music-record-opacity);
+    opacity: 1;
     box-shadow:
         0 0 0 2px rgba(var(--music-record-border), var(--music-record-border-opacity)),
         0 0 24px rgba(var(--music-record-neon), var(--music-record-neon-opacity)),
@@ -1398,7 +1397,7 @@ body.header-unfixed #video-page { padding-top: 28px; }
     inset: 0;
     border-radius: 50%;
     background: radial-gradient(circle at center, rgba(255,255,255,0.06), rgba(255,255,255,0));
-    opacity: var(--music-record-disc-opacity, var(--music-record-opacity));
+    opacity: var(--music-record-opacity);
     z-index: 2;
 }
 
@@ -1410,7 +1409,7 @@ body.header-unfixed #video-page { padding-top: 28px; }
         radial-gradient(circle at 30% 28%, rgba(255,255,255,0.3), transparent 30%),
         conic-gradient(from 190deg, #15202d, #111111 25%, #20262f 52%, #0b0f16 78%, #15202d 100%);
     z-index: 1;
-    opacity: var(--music-record-disc-opacity, var(--music-record-opacity));
+    opacity: var(--music-record-opacity);
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.22);
 }
 
@@ -1441,9 +1440,9 @@ body.header-unfixed #video-page { padding-top: 28px; }
 .record-disc:hover,
 .record-disc:focus-visible {
     box-shadow:
-        0 0 0 2px rgba(var(--music-record-border), 0.72),
-        0 0 22px rgba(var(--music-record-neon), 0.62),
-        0 0 42px rgba(var(--music-record-neon), 0.32),
+        0 0 0 2px rgba(var(--music-record-border), var(--music-record-border-opacity)),
+        0 0 22px rgba(var(--music-record-neon), var(--music-record-neon-opacity)),
+        0 0 42px rgba(var(--music-record-neon), var(--music-record-neon-opacity)),
         0 28px 60px rgba(0,0,0,0.22),
         inset 0 0 0 1px rgba(255,255,255,0.08);
     transform: scale(1.01);
@@ -1452,9 +1451,9 @@ body.header-unfixed #video-page { padding-top: 28px; }
 
 .record-disc.is-playing {
     box-shadow:
-        0 0 0 2px rgba(var(--music-record-border), 0.82),
-        0 0 26px rgba(var(--music-record-neon), 0.72),
-        0 0 56px rgba(var(--music-record-neon), 0.32),
+        0 0 0 2px rgba(var(--music-record-border), var(--music-record-border-opacity)),
+        0 0 26px rgba(var(--music-record-neon), var(--music-record-neon-opacity)),
+        0 0 56px rgba(var(--music-record-neon), var(--music-record-neon-opacity)),
         0 30px 70px rgba(0,0,0,0.22),
         inset 0 0 0 1px rgba(255,255,255,0.08);
     animation: record-spin 4.8s linear infinite;
@@ -1474,7 +1473,7 @@ body.header-unfixed #video-page { padding-top: 28px; }
         radial-gradient(circle at center, #f7f7f7 0 12%, #d8d8d8 12.5% 40%, #f0f0f0 40.5% 100%);
     display: flex; align-items: center; justify-content: center;
     box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08), 0 10px 24px rgba(0,0,0,0.18);
-    opacity: var(--music-record-disc-opacity, var(--music-record-opacity));
+    opacity: var(--music-record-opacity);
     z-index: 2;
 }
 
@@ -1521,7 +1520,7 @@ body.header-unfixed #video-page { padding-top: 28px; }
     );
     pointer-events: none;
     z-index: 3;
-    opacity: var(--music-record-disc-opacity, var(--music-record-opacity));
+    opacity: var(--music-record-opacity);
 }
 
 .record-disc.effect-rainbow-a .cd-shine {
